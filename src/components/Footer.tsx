@@ -1,7 +1,11 @@
 import { Facebook, Instagram, Twitter, Mail, Phone, MapPin } from "lucide-react";
 import logo from "figma:asset/5b5a9ccaf2f6b76406aeb93df9f19f90423b3a15.png";
 
-export function Footer() {
+interface FooterProps {
+  onNavigate?: (page: string) => void;
+}
+
+export function Footer({ onNavigate }: FooterProps) {
   return (
     <footer className="bg-gray-900 text-gray-300">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
@@ -33,19 +37,19 @@ export function Footer() {
             <h4 className="text-white mb-4">Quick Links</h4>
             <ul className="space-y-2 text-sm">
               <li>
-                <a href="#" className="hover:text-emerald-500 transition">About Us</a>
+                <button onClick={() => onNavigate?.("about")} className="hover:text-emerald-500 transition">About Us</button>
               </li>
               <li>
-                <a href="#" className="hover:text-emerald-500 transition">Our Artisans</a>
+                <button onClick={() => onNavigate?.("heritage")} className="hover:text-emerald-500 transition">Our Artisans</button>
               </li>
               <li>
-                <a href="#" className="hover:text-emerald-500 transition">Shop All</a>
+                <button onClick={() => onNavigate?.("products")} className="hover:text-emerald-500 transition">Shop All</button>
               </li>
               <li>
-                <a href="#" className="hover:text-emerald-500 transition">Heritage Stories</a>
+                <button onClick={() => onNavigate?.("heritage")} className="hover:text-emerald-500 transition">Heritage Stories</button>
               </li>
               <li>
-                <a href="#" className="hover:text-emerald-500 transition">Contact</a>
+                <button onClick={() => onNavigate?.("about")} className="hover:text-emerald-500 transition">Contact</button>
               </li>
             </ul>
           </div>
@@ -55,19 +59,19 @@ export function Footer() {
             <h4 className="text-white mb-4">Customer Service</h4>
             <ul className="space-y-2 text-sm">
               <li>
-                <a href="#" className="hover:text-emerald-500 transition">Shipping Info</a>
+                <button onClick={() => onNavigate?.("about")} className="hover:text-emerald-500 transition">Shipping Info</button>
               </li>
               <li>
-                <a href="#" className="hover:text-emerald-500 transition">Returns & Exchanges</a>
+                <button onClick={() => onNavigate?.("about")} className="hover:text-emerald-500 transition">Returns & Exchanges</button>
               </li>
               <li>
-                <a href="#" className="hover:text-emerald-500 transition">FAQs</a>
+                <button onClick={() => onNavigate?.("about")} className="hover:text-emerald-500 transition">FAQs</button>
               </li>
               <li>
-                <a href="#" className="hover:text-emerald-500 transition">Track Order</a>
+                <button onClick={() => onNavigate?.("about")} className="hover:text-emerald-500 transition">Track Order</button>
               </li>
               <li>
-                <a href="#" className="hover:text-emerald-500 transition">Privacy Policy</a>
+                <button onClick={() => onNavigate?.("about")} className="hover:text-emerald-500 transition">Privacy Policy</button>
               </li>
             </ul>
           </div>

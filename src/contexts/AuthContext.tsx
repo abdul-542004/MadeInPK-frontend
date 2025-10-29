@@ -1,6 +1,11 @@
-import { createContext, useContext, useState, useEffect, ReactNode } from "react";
-import { authApi, AuthResponse, UserProfile } from "../services/api";
-import { toast } from "sonner";
+import { createContext, useContext, useState, ReactNode } from "react";
+
+// List of admin emails - only these users get admin access
+const ADMIN_EMAILS = [
+  "admin@madeinpk.com",
+  "owner@madeinpk.com",
+  "haris@madeinpk.com", // Add your email here
+];
 
 interface SellerInfo {
   businessName: string;
@@ -13,122 +18,61 @@ interface SellerInfo {
 }
 
 interface User {
-  id: number;
-  username: string;
+  id: string;
   name: string;
   email: string;
   phone?: string;
-  isAdmin: boolean;
-  isSeller: boolean;
-  sellerInfo?: SellerInfo;
+  isAdmin: boolean; // New admin flag
+  isSeller: boolean; // Seller flag
+  sellerInfo?: SellerInfo; // Seller business details
 }
 
 interface AuthContextType {
   user: User | null;
   isAuthenticated: boolean;
-  isAdmin: boolean;
-  isSeller: boolean;
-  loading: boolean;
-  login: (email: string, password: string) => Promise<boolean>;
-  signup: (name: string, email: string, password: string) => Promise<boolean>;
-  logout: () => Promise<void>;
+  isAdmin: boolean; // New admin check
+  isSeller: boolean; // Seller check
+  login: (email: string, password: string) => void;
+  signup: (name: string, email: string, password: string) => void;
+  logout: () => void;
   updateProfile: (data: Partial<User>) => void;
-  becomeSeller: (sellerInfo: SellerInfo) => void;
+  becomeSeller: (sellerInfo: SellerInfo) => void; // New method to upgrade to seller
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
 
-  // Check for existing token on mount
-  useEffect(() => {
-    const checkAuth = async () => {
-      const token = localStorage.getItem('authToken');
-      if (token) {
-        try {
-          const response = await authApi.getProfile();
-          if (response.data) {
-            setUser(mapProfileToUser(response.data));
-          } else {
-            localStorage.removeItem('authToken');
-          }
-        } catch (error) {
-          localStorage.removeItem('authToken');
-        }
-      }
-      setLoading(false);
+  const login = (email: string, password: string) => {
+    // Check if email is in admin list
+    const isAdminUser = ADMIN_EMAILS.includes(email.toLowerCase());
+    
+    // Mock login - in real app, this would call an API
+    const mockUser: User = {
+      id: "1",
+      name: isAdminUser ? "Admin User" : "Haris Masood",
+      email: email,
+      phone: "+92 300 1234567",
+      isAdmin: isAdminUser,
+      isSeller: false, // Default to not a seller
     };
-    checkAuth();
-  }, []);
-
-  const mapProfileToUser = (profile: UserProfile): User => {
-    return {
-      id: profile.id,
-      username: profile.username,
-      name: `${profile.first_name} ${profile.last_name}`.trim() || profile.username,
-      email: profile.email,
-      phone: profile.phone_number,
-      isAdmin: profile.is_staff,
-      isSeller: profile.is_seller,
-      sellerInfo: profile.seller_profile ? {
-        businessName: profile.seller_profile.brand_name,
-        businessPhone: '',
-        businessAddress: '',
-        businessDescription: profile.seller_profile.biography,
-      } : undefined,
-    };
+    setUser(mockUser);
   };
 
-  const login = async (email: string, password: string): Promise<boolean> => {
-    try {
-      const response = await authApi.login({ email, password });
-      if (response.data) {
-        localStorage.setItem('authToken', response.data.token);
-        setUser(mapProfileToUser(response.data.user as any));
-        toast.success('Logged in successfully!');
-        return true;
-      } else if (response.error) {
-        toast.error(response.error);
-        return false;
-      }
-      return false;
-    } catch (error) {
-      toast.error('Login failed. Please try again.');
-      return false;
-    }
-  };
-
-  const signup = async (name: string, email: string, password: string): Promise<boolean> => {
-    try {
-      const nameParts = name.split(' ');
-      const firstName = nameParts[0] || '';
-      const lastName = nameParts.slice(1).join(' ') || '';
-      
-      const response = await authApi.register({
-        username: email.split('@')[0],
-        email,
-        password,
-        password_confirm: password,
-        first_name: firstName,
-        last_name: lastName,
-      });
-      
-      if (response.data) {
-        localStorage.setItem('authToken', response.data.token);
-        setUser(mapProfileToUser(response.data.user as any));
-        toast.success('Account created successfully!');
-        return true;
-      } else if (response.error) {
-        toast.error(response.error);
-        return false;
-      }
-      return false;
-    } catch (error) {
-      toast.error('Registration failed. Please try again.');
-      return false;
-    }
+  const signup = (name: string, email: string, password: string) => {
+    // Check if email is in admin list
+    const isAdminUser = ADMIN_EMAILS.includes(email.toLowerCase());
+    
+    // Mock signup - in real app, this would call an API
+    const mockUser: User = {
+      id: "1",
+      name: name,
+      email: email,
+      isAdmin: isAdminUser,
+      isSeller: false, // Default to not a seller
+    };
+    setUser(mockUser);
   };
 
   const becomeSeller = (sellerInfo: SellerInfo) => {
@@ -137,16 +81,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const logout = async () => {
-    try {
-      await authApi.logout();
-    } catch (error) {
-      // Ignore logout errors
-    } finally {
-      localStorage.removeItem('authToken');
-      setUser(null);
-      toast.success('Logged out successfully');
-    }
+  const logout = () => {
+    setUser(null);
   };
 
   const updateProfile = (data: Partial<User>) => {
@@ -162,7 +98,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isAuthenticated: !!user,
         isAdmin: user?.isAdmin || false,
         isSeller: user?.isSeller || false,
-        loading,
         login,
         signup,
         logout,

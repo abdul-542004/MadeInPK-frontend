@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useParams } from 'react-router-dom';
 import { useAuction } from '../contexts/AuctionContext';
 import { useAuth } from '../contexts/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
@@ -24,11 +25,13 @@ interface AuctionDetailPageProps {
   onBack: () => void;
 }
 
-const AuctionDetailPage: React.FC<AuctionDetailPageProps> = ({ auctionId, onBack }) => {
+const AuctionDetailPage: React.FC<AuctionDetailPageProps> = ({ auctionId: propAuctionId, onBack }) => {
+  const { id: paramId } = useParams<{ id: string }>();
+  const auctionId = propAuctionId || paramId || '';
   const { getAuction, placeBid } = useAuction();
   const { user } = useAuth();
   
-  const [auction, setAuction] = useState(getAuction(auctionId || ''));
+  const [auction, setAuction] = useState(getAuction(auctionId));
   const [bidAmount, setBidAmount] = useState('');
   const [selectedImage, setSelectedImage] = useState(0);
   const [showWinnerDialog, setShowWinnerDialog] = useState(false);
@@ -37,7 +40,7 @@ const AuctionDetailPage: React.FC<AuctionDetailPageProps> = ({ auctionId, onBack
   // Update auction data and countdown timer every second
   useEffect(() => {
     const interval = setInterval(() => {
-      const updatedAuction = getAuction(auctionId || '');
+      const updatedAuction = getAuction(auctionId);
       
       // Check if auction just ended and user is the winner
       if (

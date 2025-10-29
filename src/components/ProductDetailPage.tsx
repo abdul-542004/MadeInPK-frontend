@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useParams } from "react-router-dom";
 import { Star, Heart, ArrowLeftRight, ShoppingCart, Minus, Plus, Truck, ArrowLeft, ChevronRight } from "lucide-react";
 import { Button } from "./ui/button";
 import { Separator } from "./ui/separator";
@@ -17,11 +18,32 @@ interface ProductDetailPageProps {
   onNavigate?: (page: "home" | "products") => void;
 }
 
-export function ProductDetailPage({ product, onBack, onProductClick, onNavigate }: ProductDetailPageProps) {
+export function ProductDetailPage({ product: propProduct, onBack, onProductClick, onNavigate }: ProductDetailPageProps) {
+  const { id: paramId } = useParams<{ id: string }>();
+  const [product, setProduct] = useState(propProduct);
   const [selectedImage, setSelectedImage] = useState(0);
   const [quantity, setQuantity] = useState(1);
   const { toggleWishlist, isInWishlist } = useWishlist();
   const { addToCart } = useCart();
+
+  // Get product from URL param if not provided as prop
+  useEffect(() => {
+    if (!propProduct && paramId) {
+      const foundProduct = mockProducts.find(p => p.id === paramId);
+      if (foundProduct) {
+        setProduct(foundProduct);
+      }
+    }
+  }, [paramId, propProduct]);
+
+  if (!product) {
+    return (
+      <div className="min-h-[60vh] flex items-center justify-center">
+        <p className="text-gray-600">Product not found</p>
+      </div>
+    );
+  }
+
   const isWishlisted = isInWishlist(product.id);
 
   // For demo, using the same image multiple times as thumbnails
@@ -297,14 +319,14 @@ export function ProductDetailPage({ product, onBack, onProductClick, onNavigate 
                   </div>
                 </div>
 
-                {/* Tags
+                {/* Tags */}
                 <div className="mt-6 flex flex-wrap gap-2">
                   {product.tags.map((tag) => (
                     <Badge key={tag} variant="outline" className="text-gray-600 border-gray-300">
                       {tag}
                     </Badge>
                   ))}
-                </div> */}
+                </div>
               </div>
             </div>
           </div>

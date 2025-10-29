@@ -2,6 +2,13 @@ import React, { createContext, useContext, useState, useEffect, ReactNode } from
 import { useAuth } from './AuthContext';
 import { toast } from 'sonner@2.0.3';
 
+// Import will be added after NotificationContext is available
+let addNotificationGlobal: ((notification: any) => void) | null = null;
+
+export function setNotificationHandler(handler: (notification: any) => void) {
+  addNotificationGlobal = handler;
+}
+
 export interface Bid {
   id: string;
   auctionId: string;
@@ -198,6 +205,66 @@ export const AuctionProvider: React.FC<{ children: ReactNode }> = ({ children })
             description: `You won "${auction.productName}" with a bid of Rs ${winner.amount}`,
             duration: 5000,
           });
+          
+          // Add notification
+          if (addNotificationGlobal) {
+            addNotificationGlobal({
+              type: 'auction',
+              title: '🎉 You Won the Auction!',
+              message: `Congratulations! You won "${auction.productName}" with a bid of Rs ${winner.amount}. The seller will contact you soon.`,
+              metadata: {
+                auctionId: auction.id,
+                productName: auction.productName,
+                amount: winner.amount,
+              },
+            });
+          }
+        }
+
+        // Notify all other bidders that auction ended and they lost
+        if (auction.bids.length > 0) {
+          auction.bids.forEach(bid => {
+            if (bid.bidderId === user?.email && bid.bidderId !== winner?.bidderId) {
+              if (addNotificationGlobal) {
+                addNotificationGlobal({
+                  type: 'auction',
+                  title: 'Auction Ended',
+                  message: `The auction for "${auction.productName}" has ended. Unfortunately, you were outbid. Final price: Rs ${auction.currentBid}`,
+                  metadata: {
+                    auctionId: auction.id,
+                    productName: auction.productName,
+                    amount: auction.currentBid,
+                  },
+                });
+              }
+            }
+          });
+        }
+
+        // Notify seller
+        if (user && user.email === auction.sellerId) {
+          if (winner && addNotificationGlobal) {
+            addNotificationGlobal({
+              type: 'auction',
+              title: 'Auction Ended Successfully',
+              message: `Your auction for "${auction.productName}" ended. Winner: ${winner.bidderName} with Rs ${winner.amount}`,
+              metadata: {
+                auctionId: auction.id,
+                productName: auction.productName,
+                amount: winner.amount,
+              },
+            });
+          } else if (addNotificationGlobal) {
+            addNotificationGlobal({
+              type: 'auction',
+              title: 'Auction Ended - No Bids',
+              message: `Your auction for "${auction.productName}" ended with no bids.`,
+              metadata: {
+                auctionId: auction.id,
+                productName: auction.productName,
+              },
+            });
+          }
         }
 
         return {
@@ -291,6 +358,21 @@ export const AuctionProvider: React.FC<{ children: ReactNode }> = ({ children })
     }));
 
     toast.success('Bid placed successfully!', { duration: 2000 });
+    
+    // Add notification for the bid
+    if (addNotificationGlobal) {
+      addNotificationGlobal({
+        type: 'auction',
+        title: 'Bid Placed Successfully!',
+        message: `You placed a bid of Rs ${amount} on "${auction.productName}". You'll be notified if you're outbid.`,
+        metadata: {
+          auctionId: auction.id,
+          productName: auction.productName,
+          amount: amount,
+        },
+      });
+    }
+    
     return true;
   };
 

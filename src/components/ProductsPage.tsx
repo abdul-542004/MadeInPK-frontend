@@ -6,10 +6,9 @@ import { ProductDetailPage } from "./ProductDetailPage";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "./ui/breadcrumb";
 import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from "./ui/pagination";
-import { sortOptions, priceRanges, Product } from "../data/mockProducts";
+import { mockProducts, sortOptions, priceRanges, Product } from "../data/mockProducts";
 import { X } from "lucide-react";
 import { Button } from "./ui/button";
-import { listingApi, FixedPriceListing } from "../services/api";
 
 const PRODUCTS_PER_PAGE = 12;
 
@@ -28,37 +27,6 @@ export function ProductsPage({ searchQuery, onClearSearch }: ProductsPageProps =
   const [sortBy, setSortBy] = useState("featured");
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
-  
-  // Backend data
-  const [listings, setListings] = useState<FixedPriceListing[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  // Fetch listings from backend
-  useEffect(() => {
-    const fetchListings = async () => {
-      setLoading(true);
-      setError(null);
-      try {
-        const response = await listingApi.getListings({ status: 'active' });
-        console.log('ProductsPage - API Response:', response); // Debug log
-        if (response.data) {
-          console.log('ProductsPage - Listings data:', response.data.results); // Debug log
-          setListings(response.data.results);
-        } else if (response.error) {
-          console.log('ProductsPage - API Error:', response.error); // Debug log
-          setError(response.error);
-        }
-      } catch (err) {
-        console.log('ProductsPage - Fetch error:', err); // Debug log
-        setError(`Failed to load products: ${err}`);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchListings();
-  }, []);
 
   // Reset to page 1 when search query changes
   useEffect(() => {
@@ -67,30 +35,9 @@ export function ProductsPage({ searchQuery, onClearSearch }: ProductsPageProps =
     }
   }, [searchQuery]);
 
-  // Convert listings to Product format for compatibility
-  const products = useMemo(() => {
-    return listings.map(listing => ({
-      id: listing.product.id,
-      name: listing.product.name,
-      price: parseFloat(listing.price),
-      originalPrice: undefined,
-      rating: listing.product.average_rating || 0,
-      reviews: listing.product.total_reviews || 0,
-      image: listing.product.images.find(img => img.is_primary)?.image_url || listing.product.images[0]?.image_url || '',
-      category: listing.product.category_name,
-      region: 'Pakistan',
-      description: listing.product.description,
-      inStock: listing.quantity > 0,
-      featured: listing.featured || false,
-      seller: listing.product.seller_username,
-      condition: listing.product.condition,
-      images: listing.product.images.map(img => img.image_url)
-    }));
-  }, [listings]);
-
   // Filter and sort products
   const filteredAndSortedProducts = useMemo(() => {
-    let filtered = [...products];
+    let filtered = [...mockProducts];
 
     // Search query filter (highest priority)
     if (searchQuery && searchQuery.trim() !== "") {
@@ -314,22 +261,8 @@ export function ProductsPage({ searchQuery, onClearSearch }: ProductsPageProps =
               </div>
             </div>
 
-            {/* Loading State */}
-            {loading ? (
-              <div className="text-center py-16">
-                <p className="text-gray-600">Loading products...</p>
-              </div>
-            ) : error ? (
-              <div className="text-center py-16">
-                <p className="text-red-600 mb-4">Error: {error}</p>
-                <button
-                  onClick={() => window.location.reload()}
-                  className="text-emerald-700 hover:text-emerald-800"
-                >
-                  Try again
-                </button>
-              </div>
-            ) : paginatedProducts.length > 0 ? (
+            {/* Products Grid */}
+            {paginatedProducts.length > 0 ? (
               <>
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 mb-8">
                   {paginatedProducts.map((product) => (

@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { ShoppingCart, Search, Menu, Heart, User, LayoutDashboard } from "lucide-react";
+import { ShoppingCart, Search, Menu, Heart, User, LayoutDashboard, Bell } from "lucide-react";
 import { Button } from "./ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "./ui/tooltip";
 import { AuthDialog } from "./AuthDialog";
@@ -7,6 +7,7 @@ import { SearchDialog } from "./SearchDialog";
 import { useWishlist } from "../contexts/WishlistContext";
 import { useCart } from "../contexts/CartContext";
 import { useAuth } from "../contexts/AuthContext";
+import { useNotifications } from "../contexts/NotificationContext";
 import { Product } from "../data/mockProducts";
 import logo from "figma:asset/5b5a9ccaf2f6b76406aeb93df9f19f90423b3a15.png";
 
@@ -19,6 +20,7 @@ interface HeaderProps {
   onProductSelect?: (product: Product) => void;
   onSearchSubmit?: (query: string) => void;
   onAccountClick?: () => void;
+  onNotificationClick?: () => void;
 }
 
 export function Header({ 
@@ -27,13 +29,15 @@ export function Header({
   onCartClick, 
   onProductSelect, 
   onSearchSubmit,
-  onAccountClick 
+  onAccountClick,
+  onNotificationClick
 }: HeaderProps) {
   const [authDialogOpen, setAuthDialogOpen] = useState(false);
   const [searchDialogOpen, setSearchDialogOpen] = useState(false);
   const { wishlistItems } = useWishlist();
   const { getCartCount } = useCart();
   const { isAuthenticated, isAdmin } = useAuth();
+  const { unreadCount } = useNotifications();
   const cartCount = getCartCount();
 
   // Keyboard shortcut for search (Cmd/Ctrl + K)
@@ -164,6 +168,24 @@ export function Header({
                   </TooltipContent>
                 </Tooltip>
               </TooltipProvider>
+              
+              {/* Notifications - Only show when logged in */}
+              {isAuthenticated && (
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  onClick={onNotificationClick}
+                  className="relative text-white hover:bg-white/10 hover:text-white"
+                >
+                  <Bell className="h-5 w-5" />
+                  {unreadCount > 0 && (
+                    <span className="absolute -top-1 -right-1 bg-white text-emerald-700 text-xs rounded-full w-5 h-5 flex items-center justify-center animate-pulse">
+                      {unreadCount}
+                    </span>
+                  )}
+                </Button>
+              )}
+              
               <Button 
                 variant="ghost" 
                 size="icon" 

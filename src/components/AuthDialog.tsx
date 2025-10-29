@@ -23,48 +23,25 @@ export function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
   const [signupEmail, setSignupEmail] = useState("");
   const [signupPassword, setSignupPassword] = useState("");
   const [signupConfirmPassword, setSignupConfirmPassword] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
   
   const { login, signup } = useAuth();
 
-  const handleLogin = async (e: React.FormEvent) => {
+  const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
-    setIsLoading(true);
-    try {
-      const success = await login(loginEmail, loginPassword);
-      if (success) {
-        onOpenChange(false);
-        setLoginEmail("");
-        setLoginPassword("");
-      }
-    } finally {
-      setIsLoading(false);
-    }
+    login(loginEmail, loginPassword);
+    toast.success("Logged in successfully!");
+    onOpenChange(false);
   };
 
-  const handleSignup = async (e: React.FormEvent) => {
+  const handleSignup = (e: React.FormEvent) => {
     e.preventDefault();
     if (signupPassword !== signupConfirmPassword) {
       toast.error("Passwords do not match!");
       return;
     }
-    if (signupPassword.length < 8) {
-      toast.error("Password must be at least 8 characters!");
-      return;
-    }
-    setIsLoading(true);
-    try {
-      const success = await signup(signupName, signupEmail, signupPassword);
-      if (success) {
-        onOpenChange(false);
-        setSignupName("");
-        setSignupEmail("");
-        setSignupPassword("");
-        setSignupConfirmPassword("");
-      }
-    } finally {
-      setIsLoading(false);
-    }
+    signup(signupName, signupEmail, signupPassword);
+    toast.success("Account created successfully!");
+    onOpenChange(false);
   };
 
   return (
@@ -142,12 +119,8 @@ export function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
                 </a>
               </div>
 
-              <Button 
-                type="submit" 
-                className="w-full bg-emerald-700 hover:bg-emerald-800"
-                disabled={isLoading}
-              >
-                {isLoading ? "Logging in..." : "Login"}
+              <Button type="submit" className="w-full bg-emerald-700 hover:bg-emerald-800">
+                Login
               </Button>
 
               <div className="relative my-4">
@@ -294,12 +267,8 @@ export function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
                 </span>
               </label>
 
-              <Button 
-                type="submit" 
-                className="w-full bg-emerald-700 hover:bg-emerald-800"
-                disabled={isLoading}
-              >
-                {isLoading ? "Creating Account..." : "Create Account"}
+              <Button type="submit" className="w-full bg-emerald-700 hover:bg-emerald-800">
+                Create Account
               </Button>
 
               <div className="relative my-4">

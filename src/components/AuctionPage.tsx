@@ -1,40 +1,17 @@
 import React, { useState, useEffect } from 'react';
+import { useAuction } from '../contexts/AuctionContext';
 import { Card, CardContent } from './ui/card';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
 import { Clock, Gavel, TrendingUp } from 'lucide-react';
-import { auctionApi, AuctionListing } from '../services/api';
-import { ImageWithFallback } from './figma/ImageWithFallback';
 
 interface AuctionPageProps {
   onAuctionClick?: (auctionId: string) => void;
 }
 
 const AuctionPage: React.FC<AuctionPageProps> = ({ onAuctionClick }) => {
-  const [auctions, setAuctions] = useState<AuctionListing[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { auctions } = useAuction();
   const [, setTick] = useState(0);
-
-  // Fetch auctions from backend
-  useEffect(() => {
-    const fetchAuctions = async () => {
-      try {
-        const response = await auctionApi.getActiveAuctions();
-        if (response.data) {
-          setAuctions(response.data.results);
-        } else if (response.error) {
-          setError(response.error);
-        }
-      } catch (err) {
-        setError('Failed to load auctions');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchAuctions();
-  }, []);
 
   // Update countdown timers every second
   useEffect(() => {
@@ -44,55 +21,30 @@ const AuctionPage: React.FC<AuctionPageProps> = ({ onAuctionClick }) => {
     return () => clearInterval(interval);
   }, []);
 
-  const formatTimeRemaining = (timeRemaining: number) => {
-    if (timeRemaining <= 0) return 'Ended';
-
-    const days = Math.floor(timeRemaining / (24 * 60 * 60));
-    const hours = Math.floor((timeRemaining % (24 * 60 * 60)) / (60 * 60));
-    const minutes = Math.floor((timeRemaining % (60 * 60)) / 60);
-    const seconds = Math.floor(timeRemaining % 60);
-
+  const formatTimeRemaining = (endTime: number) => {
+    const now = Date.now();
+    const remaining = endTime - now;
+    
+    if (remaining <= 0) return 'Ended';
+    
+    const days = Math.floor(remaining / (1000 * 60 * 60 * 24));
+    const hours = Math.floor((remaining % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+    const minutes = Math.floor((remaining % (1000 * 60 * 60)) / (1000 * 60));
+    const seconds = Math.floor((remaining % (1000 * 60)) / 1000);
+    
     if (days > 0) return `${days}d ${hours}h ${minutes}m`;
     if (hours > 0) return `${hours}h ${minutes}m ${seconds}s`;
     return `${minutes}m ${seconds}s`;
   };
 
-  const getTimeColor = (timeRemaining: number) => {
-    const hours = timeRemaining / (60 * 60);
+  const getTimeColor = (endTime: number) => {
+    const remaining = endTime - Date.now();
+    const hours = remaining / (1000 * 60 * 60);
+    
     if (hours < 1) return 'text-red-600';
     if (hours < 6) return 'text-orange-600';
     return 'text-emerald-700';
   };
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gradient-to-b from-emerald-50 to-white">
-        <div className="container mx-auto px-4 py-12">
-          <div className="text-center">
-            <h1 className="text-emerald-800 mb-4">Loading Auctions...</h1>
-            <div className="flex justify-center space-x-2">
-              <div className="w-4 h-4 bg-emerald-600 rounded-full animate-bounce"></div>
-              <div className="w-4 h-4 bg-emerald-600 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-              <div className="w-4 h-4 bg-emerald-600 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="min-h-screen bg-gradient-to-b from-emerald-50 to-white">
-        <div className="container mx-auto px-4 py-12">
-          <div className="text-center">
-            <h1 className="text-red-600 mb-4">Error Loading Auctions</h1>
-            <p className="text-gray-600">{error}</p>
-          </div>
-        </div>
-      </div>
-    );
-  }
 
   const activeAuctions = auctions.filter(a => a.status === 'active');
   const endedAuctions = auctions.filter(a => a.status === 'ended');
@@ -121,72 +73,61 @@ const AuctionPage: React.FC<AuctionPageProps> = ({ onAuctionClick }) => {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {activeAuctions.map((auction) => {
-                const primaryImage = auction.product.images.find(img => img.is_primary) || auction.product.images[0];
-                
-                return (
-                  <Card 
-                    key={auction.id} 
-                    className="overflow-hidden hover:shadow-lg transition-all duration-300 cursor-pointer group border-2 hover:border-emerald-300"
-                    onClick={() => onAuctionClick?.(auction.id.toString())}
-                  >
-                    <div className="relative">
-                      <div className="aspect-[4/3] overflow-hidden bg-gray-100">
-                        <ImageWithFallback
-                          src={primaryImage?.image_url || '/placeholder-image.jpg'}
-                          alt={auction.product.name}
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                        />
+              {activeAuctions.map((auction) => (
+                <Card 
+                  key={auction.id} 
+                  className="overflow-hidden hover:shadow-lg transition-all duration-300 cursor-pointer group border-2 hover:border-emerald-300"
+                  onClick={() => onAuctionClick?.(auction.id)}
+                >
+                  <div className="relative">
+                    <div className="aspect-[4/3] overflow-hidden bg-gray-100">
+                      <img
+                        src={auction.images[0]}
+                        alt={auction.productName}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                      />
+                    </div>
+                    <Badge className="absolute top-3 right-3 bg-emerald-600 shadow-lg">
+                      <Clock className="w-3 h-3 mr-1" />
+                      Live
+                    </Badge>
+                  </div>
+
+                  <CardContent className="p-5">
+                    <h3 className="text-emerald-800 mb-2 line-clamp-1">{auction.productName}</h3>
+                    <p className="text-sm text-gray-500 mb-1">by {auction.sellerName}</p>
+                    
+                    <div className="grid grid-cols-2 gap-3 my-4 p-3 bg-emerald-50 rounded-lg">
+                      <div>
+                        <p className="text-xs text-gray-500">Base Price</p>
+                        <p className="text-emerald-700">Rs {auction.basePrice}</p>
                       </div>
-                      <Badge className="absolute top-3 right-3 bg-emerald-600 shadow-lg">
-                        <Clock className="w-3 h-3 mr-1" />
-                        Live
-                      </Badge>
-                      {auction.product.seller_profile?.is_verified && (
-                        <Badge className="absolute top-3 left-3 bg-blue-600 shadow-lg">
-                          Verified
-                        </Badge>
-                      )}
+                      <div>
+                        <p className="text-xs text-gray-500">Current Bid</p>
+                        <p className="text-emerald-700 flex items-center gap-1">
+                          <TrendingUp className="w-3 h-3" />
+                          Rs {auction.currentBid}
+                        </p>
+                      </div>
                     </div>
 
-                    <CardContent className="p-5">
-                      <h3 className="text-emerald-800 mb-2 line-clamp-1">{auction.product.name}</h3>
-                      <p className="text-sm text-gray-500 mb-1">
-                        by {auction.product.seller_profile?.brand_name || auction.product.seller_username}
-                      </p>
-                      
-                      <div className="grid grid-cols-2 gap-3 my-4 p-3 bg-emerald-50 rounded-lg">
-                        <div>
-                          <p className="text-xs text-gray-500">Starting</p>
-                          <p className="text-emerald-700 text-sm">Rs {parseFloat(auction.starting_price).toLocaleString()}</p>
-                        </div>
-                        <div>
-                          <p className="text-xs text-gray-500">Current</p>
-                          <p className="text-emerald-700 text-sm flex items-center gap-1">
-                            <TrendingUp className="w-3 h-3" />
-                            Rs {parseFloat(auction.current_price).toLocaleString()}
-                          </p>
-                        </div>
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="flex items-center gap-2">
+                        <Clock className={`w-4 h-4 ${getTimeColor(auction.endTime)}`} />
+                        <span className={`${getTimeColor(auction.endTime)}`}>
+                          {formatTimeRemaining(auction.endTime)} left
+                        </span>
                       </div>
+                      <span className="text-sm text-gray-500">{auction.bids.length} bids</span>
+                    </div>
 
-                      <div className="flex items-center justify-between mb-4">
-                        <div className="flex items-center gap-2">
-                          <Clock className={`w-4 h-4 ${getTimeColor(auction.time_remaining)}`} />
-                          <span className={`text-sm ${getTimeColor(auction.time_remaining)}`}>
-                            {formatTimeRemaining(auction.time_remaining)} left
-                          </span>
-                        </div>
-                        <span className="text-sm text-gray-500">{auction.total_bids} bids</span>
-                      </div>
-
-                      <Button className="w-full bg-emerald-600 hover:bg-emerald-700 shadow-md">
-                        <Gavel className="w-4 h-4 mr-2" />
-                        Place Bid
-                      </Button>
-                    </CardContent>
-                  </Card>
-                );
-              })}
+                    <Button className="w-full bg-emerald-600 hover:bg-emerald-700 shadow-md">
+                      <Gavel className="w-4 h-4 mr-2" />
+                      Place Bid
+                    </Button>
+                  </CardContent>
+                </Card>
+              ))}
             </div>
           </div>
         )}

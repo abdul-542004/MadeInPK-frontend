@@ -115,7 +115,7 @@ export function MyAccountPanel({
   const renderMenu = () => (
     <div className="flex flex-col h-full">
       {/* User Profile Header */}
-      <div className="flex flex-col items-center py-8 border-b">
+      <div className="flex flex-col items-center py-8 border-b flex-shrink-0">
         <Avatar className="h-20 w-20 mb-4 bg-emerald-700">
           <AvatarFallback className="text-white text-2xl">
             {user ? getInitials(user.name) : "U"}
@@ -126,7 +126,7 @@ export function MyAccountPanel({
       </div>
 
       {/* Menu Items */}
-      <div className="flex-1 py-4">
+      <div className="flex-1 py-4 overflow-y-auto">
         <button
           onClick={() => setCurrentView("profile")}
           className="w-full flex items-center gap-3 px-6 py-3 hover:bg-emerald-50 transition-colors text-left"

@@ -3,6 +3,10 @@ import { ImageWithFallback } from "./figma/ImageWithFallback";
 import { Button } from "./ui/button";
 import { ArrowRight, ChevronLeft, ChevronRight } from "lucide-react";
 
+interface HeroProps {
+  onNavigate?: (page: "products" | "heritage") => void;
+}
+
 const carouselImages = [
   {
     src: "https://images.unsplash.com/photo-1715615990733-5e43c7dd5511?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxwYWtpc3RhbiUyMGFyY2hpdGVjdHVyZSUyMGhlcml0YWdlfGVufDF8fHx8MTc2MDg3NTYxNXww&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral",
@@ -22,7 +26,7 @@ const carouselImages = [
   }
 ];
 
-export function Hero() {
+export function Hero({ onNavigate }: HeroProps) {
   const [currentSlide, setCurrentSlide] = useState(0);
 
   useEffect(() => {
@@ -134,11 +138,18 @@ export function Hero() {
               centuries-old craftsmanship and cultural pride.
             </p>
             <div className="flex flex-col sm:flex-row gap-4">
-              <Button className="bg-emerald-700 hover:bg-emerald-800">
+              <Button 
+                className="bg-emerald-700 hover:bg-emerald-800"
+                onClick={() => onNavigate?.("products")}
+              >
                 Shop Collection
                 <ArrowRight className="ml-2 h-4 w-4" />
               </Button>
-              <Button variant="outline" className="border-emerald-700 text-emerald-700 hover:bg-emerald-50">
+              <Button 
+                variant="outline" 
+                className="border-emerald-700 text-emerald-700 hover:bg-emerald-50"
+                onClick={() => onNavigate?.("heritage")}
+              >
                 Explore Heritage
               </Button>
             </div>
