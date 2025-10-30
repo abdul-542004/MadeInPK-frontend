@@ -1,11 +1,8 @@
-import { createContext, useContext, useState, ReactNode } from "react";
-
-// List of admin emails - only these users get admin access
-const ADMIN_EMAILS = [
-  "admin@madeinpk.com",
-  "owner@madeinpk.com",
-  "haris@madeinpk.com", // Add your email here
-];
+import { createContext, useContext, useState, ReactNode, useEffect } from "react";
+import { authService } from "../services/authService";
+import { User, UserRole, RegisterRequest } from "../types/auth";
+import { AxiosError } from "axios";
+import { toast } from "sonner";
 
 interface SellerInfo {
   businessName: string;
@@ -17,77 +14,131 @@ interface SellerInfo {
   bankName?: string;
 }
 
-interface User {
-  id: string;
-  name: string;
-  email: string;
-  phone?: string;
-  isAdmin: boolean; // New admin flag
-  isSeller: boolean; // Seller flag
-  sellerInfo?: SellerInfo; // Seller business details
-}
-
 interface AuthContextType {
   user: User | null;
   isAuthenticated: boolean;
-  isAdmin: boolean; // New admin check
-  isSeller: boolean; // Seller check
-  login: (email: string, password: string) => void;
-  signup: (name: string, email: string, password: string) => void;
-  logout: () => void;
+  isAdmin: boolean;
+  isSeller: boolean;
+  isBuyer: boolean;
+  loading: boolean;
+  login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
+  signup: (userData: RegisterRequest) => Promise<{ success: boolean; errors?: Record<string, string[]> }>;
+  logout: () => Promise<void>;
   updateProfile: (data: Partial<User>) => void;
-  becomeSeller: (sellerInfo: SellerInfo) => void; // New method to upgrade to seller
+  refreshProfile: () => Promise<void>;
+  becomeSeller: (sellerInfo: SellerInfo) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(true);
 
-  const login = (email: string, password: string) => {
-    // Check if email is in admin list
-    const isAdminUser = ADMIN_EMAILS.includes(email.toLowerCase());
-    
-    // Mock login - in real app, this would call an API
-    const mockUser: User = {
-      id: "1",
-      name: isAdminUser ? "Admin User" : "Haris Masood",
-      email: email,
-      phone: "+92 300 1234567",
-      isAdmin: isAdminUser,
-      isSeller: false, // Default to not a seller
+  // Initialize auth state from localStorage on mount
+  useEffect(() => {
+    const initAuth = async () => {
+      const token = localStorage.getItem('authToken');
+      const storedUser = localStorage.getItem('user');
+      
+      if (token && storedUser) {
+        try {
+          // Verify token is still valid by fetching profile
+          const userData = await authService.getProfile();
+          setUser(userData);
+        } catch (error) {
+          // Token is invalid, clear storage
+          localStorage.removeItem('authToken');
+          localStorage.removeItem('user');
+        }
+      }
+      
+      setLoading(false);
     };
-    setUser(mockUser);
-  };
-
-  const signup = (name: string, email: string, password: string) => {
-    // Check if email is in admin list
-    const isAdminUser = ADMIN_EMAILS.includes(email.toLowerCase());
     
-    // Mock signup - in real app, this would call an API
-    const mockUser: User = {
-      id: "1",
-      name: name,
-      email: email,
-      isAdmin: isAdminUser,
-      isSeller: false, // Default to not a seller
-    };
-    setUser(mockUser);
-  };
+    initAuth();
+  }, []);
 
-  const becomeSeller = (sellerInfo: SellerInfo) => {
-    if (user) {
-      setUser({ ...user, isSeller: true, sellerInfo });
+  const login = async (email: string, password: string): Promise<{ success: boolean; error?: string }> => {
+    try {
+      const response = await authService.login({ email, password });
+      
+      // Save token and user data
+      localStorage.setItem('authToken', response.token);
+      localStorage.setItem('user', JSON.stringify(response.user));
+      setUser(response.user);
+      
+      return { success: true };
+    } catch (error) {
+      const axiosError = error as AxiosError<{ error?: string }>;
+      
+      if (axiosError.response?.status === 401) {
+        return { success: false, error: 'Invalid email or password' };
+      } else if (axiosError.response?.status === 403) {
+        return { success: false, error: axiosError.response.data?.error || 'Your account has been blocked' };
+      }
+      
+      return { success: false, error: 'Login failed. Please try again.' };
     }
   };
 
-  const logout = () => {
-    setUser(null);
+  const signup = async (userData: RegisterRequest): Promise<{ success: boolean; errors?: Record<string, string[]> }> => {
+    try {
+      const response = await authService.register(userData);
+      
+      // Save token and user data
+      localStorage.setItem('authToken', response.token);
+      localStorage.setItem('user', JSON.stringify(response.user));
+      setUser(response.user);
+      
+      return { success: true };
+    } catch (error) {
+      const axiosError = error as AxiosError<Record<string, string[]>>;
+      
+      if (axiosError.response?.data) {
+        return { success: false, errors: axiosError.response.data };
+      }
+      
+      return { success: false, errors: { general: ['Registration failed. Please try again.'] } };
+    }
+  };
+
+  const becomeSeller = (sellerInfo: SellerInfo) => {
+    // This would need to call a backend API to upgrade user to seller
+    // For now, just log the seller info
+    console.log('Become seller:', sellerInfo);
+    toast.info('Seller registration feature coming soon!');
+  };
+
+  const logout = async () => {
+    try {
+      await authService.logout();
+    } catch (error) {
+      console.error('Logout error:', error);
+    } finally {
+      // Clear state and localStorage regardless of API response
+      setUser(null);
+      localStorage.removeItem('authToken');
+      localStorage.removeItem('user');
+    }
   };
 
   const updateProfile = (data: Partial<User>) => {
     if (user) {
-      setUser({ ...user, ...data });
+      const updatedUser = { ...user, ...data };
+      setUser(updatedUser);
+      localStorage.setItem('user', JSON.stringify(updatedUser));
+    }
+  };
+
+  const refreshProfile = async () => {
+    try {
+      const userData = await authService.getProfile();
+      setUser(userData);
+      localStorage.setItem('user', JSON.stringify(userData));
+    } catch (error) {
+      console.error('Failed to refresh profile:', error);
+      toast.error('Failed to refresh profile');
     }
   };
 
@@ -96,16 +147,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       value={{
         user,
         isAuthenticated: !!user,
-        isAdmin: user?.isAdmin || false,
-        isSeller: user?.isSeller || false,
+        isAdmin: user?.role === 'admin',
+        isSeller: user?.role === 'seller' || user?.role === 'both',
+        isBuyer: user?.role === 'buyer' || user?.role === 'both',
+        loading,
         login,
         signup,
         logout,
         updateProfile,
+        refreshProfile,
         becomeSeller,
       }}
     >
-      {children}
+      {!loading && children}
     </AuthContext.Provider>
   );
 }

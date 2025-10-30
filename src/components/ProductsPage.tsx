@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { ProductCard } from "./ProductCard";
 import { ProductFilters } from "./ProductFilters";
 import { PromotionalBanner } from "./PromotionalBanner";
@@ -6,9 +6,12 @@ import { ProductDetailPage } from "./ProductDetailPage";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "./ui/breadcrumb";
 import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from "./ui/pagination";
-import { mockProducts, sortOptions, priceRanges, Product } from "../data/mockProducts";
-import { X } from "lucide-react";
+import { X, Loader2 } from "lucide-react";
 import { Button } from "./ui/button";
+import { productService } from "../services/productService";
+import { FixedPriceListing } from "../types/product";
+import { toast } from "sonner";
+import { priceRanges, sortOptions } from "../data/mockProducts";
 
 const PRODUCTS_PER_PAGE = 12;
 
@@ -18,6 +21,11 @@ interface ProductsPageProps {
 }
 
 export function ProductsPage({ searchQuery, onClearSearch }: ProductsPageProps = {}) {
+  // Data states
+  const [listings, setListings] = useState<FixedPriceListing[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [totalCount, setTotalCount] = useState(0);
+  
   // Filter states
   const [selectedCategory, setSelectedCategory] = useState("All");
   const [selectedRegion, setSelectedRegion] = useState("All Regions");
@@ -26,91 +34,71 @@ export function ProductsPage({ searchQuery, onClearSearch }: ProductsPageProps =
   const [onSaleOnly, setOnSaleOnly] = useState(false);
   const [sortBy, setSortBy] = useState("featured");
   const [currentPage, setCurrentPage] = useState(1);
-  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  const [selectedListing, setSelectedListing] = useState<FixedPriceListing | null>(null);
 
-  // Reset to page 1 when search query changes
+  // Load listings from backend
   useEffect(() => {
-    if (searchQuery) {
-      setCurrentPage(1);
+    loadListings();
+  }, [searchQuery, selectedCategory, selectedPriceRange, inStockOnly, sortBy, currentPage]);
+
+  const loadListings = async () => {
+    try {
+      setLoading(true);
+      
+      // Build filters
+      const filters: any = {
+        status: 'active',
+        page: currentPage,
+        page_size: PRODUCTS_PER_PAGE,
+      };
+
+      // Search
+      if (searchQuery && searchQuery.trim()) {
+        filters.search = searchQuery.trim();
+      }
+
+      // Category filter (would need category IDs from backend)
+      // if (selectedCategory !== "All") {
+      //   filters.category = getCategoryId(selectedCategory);
+      // }
+
+      // Price range
+      const priceRange = priceRanges[selectedPriceRange];
+      if (priceRange.min > 0) {
+        filters.min_price = priceRange.min;
+      }
+      if (priceRange.max < 999999) {
+        filters.max_price = priceRange.max;
+      }
+
+      // Sorting
+      switch (sortBy) {
+        case "price-asc":
+          filters.ordering = "price";
+          break;
+        case "price-desc":
+          filters.ordering = "-price";
+          break;
+        case "newest":
+          filters.ordering = "-created_at";
+          break;
+        default:
+          filters.ordering = "-created_at";
+      }
+
+      const response = await productService.getFixedPriceListings(filters);
+      setListings(response.results);
+      setTotalCount(response.count);
+    } catch (error) {
+      console.error("Failed to load products:", error);
+      toast.error("Failed to load products");
+    } finally {
+      setLoading(false);
     }
-  }, [searchQuery]);
-
-  // Filter and sort products
-  const filteredAndSortedProducts = useMemo(() => {
-    let filtered = [...mockProducts];
-
-    // Search query filter (highest priority)
-    if (searchQuery && searchQuery.trim() !== "") {
-      const query = searchQuery.toLowerCase();
-      filtered = filtered.filter((p) => {
-        return (
-          p.name.toLowerCase().includes(query) ||
-          p.category.toLowerCase().includes(query) ||
-          p.description.toLowerCase().includes(query) ||
-          p.region.toLowerCase().includes(query)
-        );
-      });
-    }
-
-    // Category filter
-    if (selectedCategory !== "All") {
-      filtered = filtered.filter((p) => p.category === selectedCategory);
-    }
-
-    // Region filter
-    if (selectedRegion !== "All Regions") {
-      filtered = filtered.filter((p) => p.region === selectedRegion);
-    }
-
-    // Price range filter
-    const priceRange = priceRanges[selectedPriceRange];
-    filtered = filtered.filter(
-      (p) => p.price >= priceRange.min && p.price <= priceRange.max
-    );
-
-    // In stock filter
-    if (inStockOnly) {
-      filtered = filtered.filter((p) => p.inStock);
-    }
-
-    // On sale filter
-    if (onSaleOnly) {
-      filtered = filtered.filter((p) => p.originalPrice !== undefined);
-    }
-
-    // Sort products
-    switch (sortBy) {
-      case "featured":
-        filtered.sort((a, b) => (b.featured ? 1 : 0) - (a.featured ? 1 : 0));
-        break;
-      case "newest":
-        filtered.sort((a, b) => b.id - a.id);
-        break;
-      case "price-asc":
-        filtered.sort((a, b) => a.price - b.price);
-        break;
-      case "price-desc":
-        filtered.sort((a, b) => b.price - a.price);
-        break;
-      case "reviews":
-        filtered.sort((a, b) => b.reviews - a.reviews);
-        break;
-      case "rating":
-        filtered.sort((a, b) => b.rating - a.rating);
-        break;
-      default:
-        break;
-    }
-
-    return filtered;
-  }, [searchQuery, selectedCategory, selectedRegion, selectedPriceRange, inStockOnly, onSaleOnly, sortBy]);
+  };
 
   // Pagination
-  const totalPages = Math.ceil(filteredAndSortedProducts.length / PRODUCTS_PER_PAGE);
-  const paginatedProducts = filteredAndSortedProducts.slice(
-    (currentPage - 1) * PRODUCTS_PER_PAGE,
-    currentPage * PRODUCTS_PER_PAGE
-  );
+  const totalPages = Math.ceil(totalCount / PRODUCTS_PER_PAGE);
 
   // Reset to page 1 when filters change
   const handleFilterChange = () => {
@@ -126,13 +114,12 @@ export function ProductsPage({ searchQuery, onClearSearch }: ProductsPageProps =
     setCurrentPage(1);
   };
 
-  // If a product is selected, show the detail page
-  if (selectedProduct) {
+  // If a listing is selected, show the detail page
+  if (selectedListing) {
     return (
       <ProductDetailPage 
-        product={selectedProduct} 
-        onBack={() => setSelectedProduct(null)}
-        onProductClick={setSelectedProduct}
+        listing={selectedListing} 
+        onBack={() => setSelectedListing(null)}
       />
     );
   }
@@ -177,7 +164,7 @@ export function ProductsPage({ searchQuery, onClearSearch }: ProductsPageProps =
                   <span className="text-emerald-700">"{searchQuery}"</span>
                 </span>
                 <span className="text-gray-500 text-sm">
-                  ({filteredAndSortedProducts.length} {filteredAndSortedProducts.length === 1 ? 'product' : 'products'})
+                  ({totalCount} {totalCount === 1 ? 'product' : 'products'})
                 </span>
               </div>
               {onClearSearch && (
@@ -239,7 +226,7 @@ export function ProductsPage({ searchQuery, onClearSearch }: ProductsPageProps =
                   onClearFilters={clearFilters}
                 />
                 <p className="text-emerald-700">
-                  <span className="text-gray-900">{filteredAndSortedProducts.length}</span> {filteredAndSortedProducts.length === 1 ? 'product' : 'products'} found
+                  <span className="text-gray-900">{totalCount}</span> {totalCount === 1 ? 'product' : 'products'} found
                 </p>
               </div>
 
@@ -262,14 +249,19 @@ export function ProductsPage({ searchQuery, onClearSearch }: ProductsPageProps =
             </div>
 
             {/* Products Grid */}
-            {paginatedProducts.length > 0 ? (
+            {loading ? (
+              <div className="flex justify-center items-center py-16">
+                <Loader2 className="h-8 w-8 animate-spin text-emerald-700" />
+                <span className="ml-3 text-gray-600">Loading products...</span>
+              </div>
+            ) : listings.length > 0 ? (
               <>
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 mb-8">
-                  {paginatedProducts.map((product) => (
+                  {listings.map((listing) => (
                     <ProductCard 
-                      key={product.id} 
-                      product={product}
-                      onProductClick={setSelectedProduct}
+                      key={listing.id} 
+                      listing={listing}
+                      onListingClick={setSelectedListing}
                     />
                   ))}
                 </div>

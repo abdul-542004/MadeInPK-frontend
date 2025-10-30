@@ -1,42 +1,74 @@
 import { useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
-import { Star, Heart, ArrowLeftRight, ShoppingCart, Minus, Plus, Truck, ArrowLeft, ChevronRight } from "lucide-react";
+import { Star, Heart, ArrowLeftRight, ShoppingCart, Minus, Plus, Truck, ArrowLeft, ChevronRight, Loader2 } from "lucide-react";
 import { Button } from "./ui/button";
 import { Separator } from "./ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
 import { Badge } from "./ui/badge";
 import { Product, mockProducts } from "../data/mockProducts";
+import { FixedPriceListing } from "../types/product";
 import { ProductCard } from "./ProductCard";
 import { useWishlist } from "../contexts/WishlistContext";
 import { useCart } from "../contexts/CartContext";
-import { toast } from "sonner@2.0.3";
+import { productService } from "../services/productService";
+import { toast } from "sonner";
 
 interface ProductDetailPageProps {
-  product: Product;
+  product?: Product;
+  listing?: FixedPriceListing;
   onBack: () => void;
   onProductClick?: (product: Product) => void;
   onNavigate?: (page: "home" | "products") => void;
 }
 
-export function ProductDetailPage({ product: propProduct, onBack, onProductClick, onNavigate }: ProductDetailPageProps) {
+export function ProductDetailPage({ product: propProduct, listing: propListing, onBack, onProductClick, onNavigate }: ProductDetailPageProps) {
   const { id: paramId } = useParams<{ id: string }>();
   const [product, setProduct] = useState(propProduct);
+  const [listing, setListing] = useState(propListing);
+  const [loading, setLoading] = useState(!propProduct && !propListing);
   const [selectedImage, setSelectedImage] = useState(0);
   const [quantity, setQuantity] = useState(1);
   const { toggleWishlist, isInWishlist } = useWishlist();
   const { addToCart } = useCart();
 
-  // Get product from URL param if not provided as prop
+  // Load listing from backend if ID provided in URL
   useEffect(() => {
-    if (!propProduct && paramId) {
-      const foundProduct = mockProducts.find(p => p.id === paramId);
-      if (foundProduct) {
-        setProduct(foundProduct);
+    const loadListing = async () => {
+      if (!propProduct && !propListing && paramId) {
+        try {
+          setLoading(true);
+          const response = await productService.getFixedPriceListings({ page_size: 1 });
+          const found = response.results.find(l => l.id.toString() === paramId);
+          if (found) {
+            setListing(found);
+          } else {
+            // Try mock products as fallback
+            const foundProduct = mockProducts.find(p => p.id.toString() === paramId);
+            if (foundProduct) {
+              setProduct(foundProduct);
+            }
+          }
+        } catch (error) {
+          console.error('Failed to load listing:', error);
+          toast.error('Failed to load product details');
+        } finally {
+          setLoading(false);
+        }
       }
-    }
-  }, [paramId, propProduct]);
+    };
+    loadListing();
+  }, [paramId, propProduct, propListing]);
 
-  if (!product) {
+  if (loading) {
+    return (
+      <div className="min-h-[60vh] flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-emerald-700" />
+        <span className="ml-3 text-gray-600">Loading product...</span>
+      </div>
+    );
+  }
+
+  if (!product && !listing) {
     return (
       <div className="min-h-[60vh] flex items-center justify-center">
         <p className="text-gray-600">Product not found</p>
@@ -44,19 +76,32 @@ export function ProductDetailPage({ product: propProduct, onBack, onProductClick
     );
   }
 
-  const isWishlisted = isInWishlist(product.id);
+  // Support both backend listing and mock product
+  const isBackendListing = !!listing;
+  const displayProduct = listing ? listing.product : product;
+  const price = listing ? parseFloat(listing.price) : product?.price || 0;
+  const inStock = listing ? listing.quantity > 0 : product?.inStock || false;
+  const stockCount = listing ? listing.quantity : (product?.inStock ? Math.floor(Math.random() * 50) + 10 : 0);
+  
+  if (!displayProduct) return null;
 
-  // For demo, using the same image multiple times as thumbnails
-  const productImages = [product.image, product.image, product.image, product.image];
+  // Type-safe access to backend product
+  const backendProduct = isBackendListing ? displayProduct as any : null;
+  const productId = listing ? listing.id : product?.id || 0;
+  const isWishlisted = isInWishlist(productId);
 
-  const stockCount = product.inStock ? Math.floor(Math.random() * 50) + 10 : 0;
-  const discount = product.originalPrice 
+  // Images
+  const productImages = isBackendListing 
+    ? (backendProduct?.images || [])
+    : [product?.image, product?.image, product?.image, product?.image].filter(Boolean);
+
+  const discount = !isBackendListing && product?.originalPrice 
     ? Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100)
     : 0;
 
-  // Get related products - same category or region, excluding current product
+  // Get related products - same category, excluding current product
   const relatedProducts = mockProducts
-    .filter((p) => p.id !== product.id && (p.category === product.category || p.region === product.region))
+    .filter((p) => product && (p.id !== product.id && (p.category === product.category || p.region === product.region)))
     .slice(0, 8);
 
   const handleQuantityChange = (delta: number) => {
@@ -67,12 +112,20 @@ export function ProductDetailPage({ product: propProduct, onBack, onProductClick
   };
 
   const handleWishlistClick = () => {
-    toggleWishlist(product);
+    if (product) {
+      toggleWishlist(product);
+    } else {
+      toast.info("Wishlist feature coming soon for backend products!");
+    }
   };
 
   const handleAddToCart = () => {
-    addToCart(product, quantity);
-    toast.success(`${quantity} x ${product.name} added to cart!`);
+    if (product) {
+      addToCart(product, quantity);
+      toast.success(`${quantity} x ${displayProduct.name} added to cart!`);
+    } else {
+      toast.info("Add to cart feature coming soon!");
+    }
   };
 
   return (
@@ -114,9 +167,9 @@ export function ProductDetailPage({ product: propProduct, onBack, onProductClick
               Products
             </button>
             <ChevronRight className="h-4 w-4 text-gray-400" />
-            <span className="text-gray-600">{product.category}</span>
+            <span className="text-gray-600">{isBackendListing ? backendProduct?.category_name : product?.category}</span>
             <ChevronRight className="h-4 w-4 text-gray-400" />
-            <span className="text-emerald-700">{product.name}</span>
+            <span className="text-emerald-700">{displayProduct.name}</span>
           </div>
         </div>
       </div>
@@ -129,7 +182,7 @@ export function ProductDetailPage({ product: propProduct, onBack, onProductClick
             <div className="flex flex-col-reverse sm:flex-row gap-4">
               {/* Thumbnails */}
               <div className="flex sm:flex-col gap-2 overflow-x-auto sm:overflow-y-auto sm:max-h-[500px]">
-                {productImages.map((img, index) => (
+                {productImages.map((img: any, index: number) => (
                   <button
                     key={index}
                     onClick={() => setSelectedImage(index)}
@@ -140,8 +193,8 @@ export function ProductDetailPage({ product: propProduct, onBack, onProductClick
                     }`}
                   >
                     <img
-                      src={img}
-                      alt={`${product.name} view ${index + 1}`}
+                      src={isBackendListing ? img?.image_url : img}
+                      alt={`${displayProduct.name} view ${index + 1}`}
                       className="w-full h-full object-cover"
                     />
                   </button>
@@ -151,8 +204,8 @@ export function ProductDetailPage({ product: propProduct, onBack, onProductClick
               {/* Main Image */}
               <div className="flex-1 relative aspect-square rounded-lg overflow-hidden bg-gray-100 border border-gray-200">
                 <img
-                  src={productImages[selectedImage]}
-                  alt={product.name}
+                  src={isBackendListing ? productImages[selectedImage]?.image_url : productImages[selectedImage]}
+                  alt={displayProduct.name}
                   className="w-full h-full object-cover"
                 />
                 {discount > 0 && (
@@ -162,7 +215,7 @@ export function ProductDetailPage({ product: propProduct, onBack, onProductClick
                     </Badge>
                   </div>
                 )}
-                {product.featured && (
+                {(listing?.featured || product?.featured) && (
                   <div className="absolute top-4 right-4">
                     <Badge className="bg-emerald-700 text-white hover:bg-emerald-800">
                       Featured
@@ -176,31 +229,39 @@ export function ProductDetailPage({ product: propProduct, onBack, onProductClick
             <div className="flex flex-col">
               <div className="flex-1">
                 {/* Product Title */}
-                <h1 className="text-emerald-700 mb-2">{product.name}</h1>
+                <h1 className="text-emerald-700 mb-2">{displayProduct.name}</h1>
 
                 {/* Artisan/Brand */}
                 <div className="mb-4">
                   <p className="text-gray-600">
-                    By <span className="text-emerald-700">{product.artisan}</span>
+                    By <span className="text-emerald-700">
+                      {isBackendListing 
+                        ? (backendProduct?.seller_profile?.brand_name || backendProduct?.seller_username)
+                        : product?.artisan
+                      }
+                    </span>
                   </p>
                 </div>
 
                 {/* Rating & Reviews */}
                 <div className="flex items-center gap-2 mb-4">
                   <div className="flex items-center gap-1">
-                    {Array.from({ length: 5 }).map((_, i) => (
-                      <Star
-                        key={i}
-                        className={`h-5 w-5 ${
-                          i < Math.floor(product.rating)
-                            ? "fill-yellow-400 text-yellow-400"
-                            : "fill-gray-200 text-gray-200"
-                        }`}
-                      />
-                    ))}
+                    {Array.from({ length: 5 }).map((_, i) => {
+                      const rating = isBackendListing ? (backendProduct?.average_rating || 0) : (product?.rating || 0);
+                      return (
+                        <Star
+                          key={i}
+                          className={`h-5 w-5 ${
+                            i < Math.floor(rating)
+                              ? "fill-yellow-400 text-yellow-400"
+                              : "fill-gray-200 text-gray-200"
+                          }`}
+                        />
+                      );
+                    })}
                   </div>
                   <span className="text-gray-600">
-                    ({product.reviews} reviews)
+                    ({isBackendListing ? (backendProduct?.total_reviews || 0) : (product?.reviews || 0)} reviews)
                   </span>
                 </div>
 
@@ -209,20 +270,20 @@ export function ProductDetailPage({ product: propProduct, onBack, onProductClick
                 {/* Price */}
                 <div className="mb-4">
                   <div className="flex items-baseline gap-3">
-                    {product.originalPrice && (
+                    {!isBackendListing && product?.originalPrice && (
                       <span className="text-gray-400 line-through">
-                        Rs. {product.originalPrice.toLocaleString()}
+                        PKR {product.originalPrice.toLocaleString()}
                       </span>
                     )}
                     <span className="text-emerald-700">
-                      Rs. {product.price.toLocaleString()}
+                      PKR {price.toLocaleString()}
                     </span>
                   </div>
                 </div>
 
                 {/* Stock Availability */}
                 <div className="mb-6">
-                  {product.inStock ? (
+                  {inStock ? (
                     <div className="flex items-center gap-2">
                       <div className="h-3 w-3 rounded-full bg-emerald-500"></div>
                       <span className="text-emerald-700">
@@ -239,18 +300,31 @@ export function ProductDetailPage({ product: propProduct, onBack, onProductClick
 
                 {/* Description */}
                 <p className="text-gray-600 mb-6 leading-relaxed">
-                  {product.description}. Handcrafted with care by skilled artisans from {product.region}, this piece represents the rich cultural heritage and traditional craftsmanship of Pakistan.
+                  {displayProduct.description}
+                  {!isBackendListing && product?.region && (
+                    <>. Handcrafted with care by skilled artisans from {product.region}, this piece represents the rich cultural heritage and traditional craftsmanship of Pakistan.</>
+                  )}
                 </p>
 
                 {/* Region & Category Info */}
                 <div className="grid grid-cols-2 gap-4 mb-6">
-                  <div>
-                    <p className="text-gray-500">Region</p>
-                    <p className="text-gray-900">{product.region}</p>
-                  </div>
+                  {!isBackendListing && product?.region && (
+                    <div>
+                      <p className="text-gray-500">Region</p>
+                      <p className="text-gray-900">{product.region}</p>
+                    </div>
+                  )}
+                  {isBackendListing && backendProduct?.condition && (
+                    <div>
+                      <p className="text-gray-500">Condition</p>
+                      <p className="text-gray-900 capitalize">{backendProduct.condition.replace('_', ' ')}</p>
+                    </div>
+                  )}
                   <div>
                     <p className="text-gray-500">Category</p>
-                    <p className="text-gray-900">{product.category}</p>
+                    <p className="text-gray-900">
+                      {isBackendListing ? backendProduct?.category_name : product?.category}
+                    </p>
                   </div>
                 </div>
 
@@ -282,7 +356,7 @@ export function ProductDetailPage({ product: propProduct, onBack, onProductClick
                       </span>
                       <button
                         onClick={() => handleQuantityChange(1)}
-                        disabled={!product.inStock || quantity >= stockCount}
+                        disabled={!inStock || quantity >= stockCount}
                         className="px-3 py-2 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                       >
                         <Plus className="h-4 w-4 text-gray-600" />
@@ -293,7 +367,7 @@ export function ProductDetailPage({ product: propProduct, onBack, onProductClick
                   {/* Add to Cart Button */}
                   <Button
                     size="lg"
-                    disabled={!product.inStock}
+                    disabled={!inStock}
                     onClick={handleAddToCart}
                     className="w-full bg-emerald-700 hover:bg-emerald-800 text-white"
                   >
@@ -320,13 +394,15 @@ export function ProductDetailPage({ product: propProduct, onBack, onProductClick
                 </div>
 
                 {/* Tags */}
-                <div className="mt-6 flex flex-wrap gap-2">
-                  {product.tags.map((tag) => (
-                    <Badge key={tag} variant="outline" className="text-gray-600 border-gray-300">
-                      {tag}
-                    </Badge>
-                  ))}
-                </div>
+                {!isBackendListing && product?.tags && (
+                  <div className="mt-6 flex flex-wrap gap-2">
+                    {product.tags.map((tag) => (
+                      <Badge key={tag} variant="outline" className="text-gray-600 border-gray-300">
+                        {tag}
+                      </Badge>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -339,10 +415,10 @@ export function ProductDetailPage({ product: propProduct, onBack, onProductClick
                   Description
                 </TabsTrigger>
                 <TabsTrigger value="reviews" className="flex-1 sm:flex-none">
-                  Reviews ({product.reviews})
+                  Reviews ({isBackendListing ? (backendProduct?.total_reviews || 0) : (product?.reviews || 0)})
                 </TabsTrigger>
                 <TabsTrigger value="artisan" className="flex-1 sm:flex-none">
-                  Artisan Info
+                  {isBackendListing ? 'Seller Info' : 'Artisan Info'}
                 </TabsTrigger>
               </TabsList>
 
@@ -350,7 +426,10 @@ export function ProductDetailPage({ product: propProduct, onBack, onProductClick
                 <div className="prose max-w-none">
                   <h3 className="text-emerald-700 mb-4">Product Description</h3>
                   <p className="text-gray-600 leading-relaxed mb-4">
-                    {product.description}. This authentic Pakistani handcrafted item showcases the exceptional skills and traditional techniques passed down through generations of artisans in {product.region}.
+                    {displayProduct.description}
+                    {!isBackendListing && product?.region && (
+                      <>. This authentic Pakistani handcrafted item showcases the exceptional skills and traditional techniques passed down through generations of artisans in {product.region}.</>
+                    )}
                   </p>
                   <p className="text-gray-600 leading-relaxed mb-4">
                     Each piece is carefully crafted using time-honored methods, ensuring that every item is unique and carries the rich cultural heritage of Pakistan. The attention to detail and quality of craftsmanship makes this a perfect addition to your collection or a thoughtful gift for someone special.
@@ -358,7 +437,12 @@ export function ProductDetailPage({ product: propProduct, onBack, onProductClick
                   <h4 className="text-emerald-700 mb-3 mt-6">Key Features:</h4>
                   <ul className="list-disc list-inside text-gray-600 space-y-2 mb-4">
                     <li>100% Handcrafted by skilled Pakistani artisans</li>
-                    <li>Authentic {product.category.toLowerCase()} from {product.region}</li>
+                    {!isBackendListing && product?.category && product?.region && (
+                      <li>Authentic {product.category.toLowerCase()} from {product.region}</li>
+                    )}
+                    {isBackendListing && (
+                      <li>Condition: {backendProduct?.condition?.replace('_', ' ')}</li>
+                    )}
                     <li>Traditional techniques and premium materials</li>
                     <li>Each piece is unique with slight variations</li>
                     <li>Supports local artisan communities</li>
@@ -440,23 +524,55 @@ export function ProductDetailPage({ product: propProduct, onBack, onProductClick
 
               <TabsContent value="artisan" className="mt-6">
                 <div className="prose max-w-none">
-                  <h3 className="text-emerald-700 mb-4">About {product.artisan}</h3>
-                  <p className="text-gray-600 leading-relaxed mb-4">
-                    {product.artisan} is a renowned name in Pakistani traditional crafts, based in the culturally rich region of {product.region}. With years of experience and dedication to preserving traditional techniques, they have become synonymous with quality and authenticity.
-                  </p>
-                  <p className="text-gray-600 leading-relaxed mb-4">
-                    The artisans at {product.artisan} are committed to maintaining the highest standards of craftsmanship while supporting their local communities. Each piece they create tells a story of Pakistan's rich cultural heritage and the skilled hands that bring these traditions to life.
-                  </p>
-                  <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-4 mt-6">
-                    <h4 className="text-emerald-700 mb-2">Why Choose {product.artisan}?</h4>
-                    <ul className="list-disc list-inside text-gray-600 space-y-2">
-                      <li>Generations of traditional craftsmanship</li>
-                      <li>Commitment to quality and authenticity</li>
-                      <li>Support for local artisan communities</li>
-                      <li>Sustainable and ethical production practices</li>
-                      <li>Preservation of Pakistani cultural heritage</li>
-                    </ul>
-                  </div>
+                  {isBackendListing ? (
+                    <>
+                      <h3 className="text-emerald-700 mb-4">
+                        About {backendProduct?.seller_profile?.brand_name || backendProduct?.seller_username}
+                      </h3>
+                      {backendProduct?.seller_profile?.biography && (
+                        <p className="text-gray-600 leading-relaxed mb-4">
+                          {backendProduct.seller_profile.biography}
+                        </p>
+                      )}
+                      <div className="grid grid-cols-2 gap-4 mb-4">
+                        <div>
+                          <p className="text-gray-500">Seller Rating</p>
+                          <p className="text-gray-900">
+                            {backendProduct?.seller_profile?.average_rating || 'N/A'} ⭐
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-gray-500">Verified</p>
+                          <p className="text-gray-900">
+                            {backendProduct?.seller_profile?.is_verified ? '✓ Yes' : 'No'}
+                          </p>
+                        </div>
+                      </div>
+                      <p className="text-gray-600 leading-relaxed mb-4">
+                        This seller is committed to providing quality handcrafted products and excellent customer service.
+                      </p>
+                    </>
+                  ) : (
+                    <>
+                      <h3 className="text-emerald-700 mb-4">About {product?.artisan}</h3>
+                      <p className="text-gray-600 leading-relaxed mb-4">
+                        {product?.artisan} is a renowned name in Pakistani traditional crafts, based in the culturally rich region of {product?.region}. With years of experience and dedication to preserving traditional techniques, they have become synonymous with quality and authenticity.
+                      </p>
+                      <p className="text-gray-600 leading-relaxed mb-4">
+                        The artisans at {product?.artisan} are committed to maintaining the highest standards of craftsmanship while supporting their local communities. Each piece they create tells a story of Pakistan's rich cultural heritage and the skilled hands that bring these traditions to life.
+                      </p>
+                      <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-4 mt-6">
+                        <h4 className="text-emerald-700 mb-2">Why Choose {product?.artisan}?</h4>
+                        <ul className="list-disc list-inside text-gray-600 space-y-2">
+                          <li>Generations of traditional craftsmanship</li>
+                          <li>Commitment to quality and authenticity</li>
+                          <li>Support for local artisan communities</li>
+                          <li>Sustainable and ethical production practices</li>
+                          <li>Preservation of Pakistani cultural heritage</li>
+                        </ul>
+                      </div>
+                    </>
+                  )}
                 </div>
               </TabsContent>
             </Tabs>

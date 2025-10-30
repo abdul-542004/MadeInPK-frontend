@@ -4,9 +4,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { Button } from "./ui/button";
-import { Mail, Lock, User, Eye, EyeOff } from "lucide-react";
+import { Mail, Lock, User, Eye, EyeOff, Loader2, Phone } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
-import { toast } from "sonner@2.0.3";
+import { toast } from "sonner";
+import { UserRole } from "../types/auth";
 import logo from "figma:asset/5b5a9ccaf2f6b76406aeb93df9f19f90423b3a15.png";
 
 interface AuthDialogProps {
@@ -19,29 +20,85 @@ export function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loginEmail, setLoginEmail] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
-  const [signupName, setSignupName] = useState("");
+  const [loginLoading, setLoginLoading] = useState(false);
+  const [loginError, setLoginError] = useState("");
+  
+  const [signupUsername, setSignupUsername] = useState("");
+  const [signupFirstName, setSignupFirstName] = useState("");
+  const [signupLastName, setSignupLastName] = useState("");
   const [signupEmail, setSignupEmail] = useState("");
+  const [signupPhone, setSignupPhone] = useState("");
   const [signupPassword, setSignupPassword] = useState("");
   const [signupConfirmPassword, setSignupConfirmPassword] = useState("");
+  const [signupRole, setSignupRole] = useState<UserRole>("buyer");
+  const [signupLoading, setSignupLoading] = useState(false);
+  const [signupErrors, setSignupErrors] = useState<Record<string, string[]>>({});
   
   const { login, signup } = useAuth();
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    login(loginEmail, loginPassword);
-    toast.success("Logged in successfully!");
-    onOpenChange(false);
+    setLoginError("");
+    setLoginLoading(true);
+    
+    const result = await login(loginEmail, loginPassword);
+    
+    setLoginLoading(false);
+    
+    if (result.success) {
+      toast.success("Logged in successfully!");
+      onOpenChange(false);
+      // Reset form
+      setLoginEmail("");
+      setLoginPassword("");
+    } else {
+      setLoginError(result.error || "Login failed");
+      toast.error(result.error || "Login failed");
+    }
   };
 
-  const handleSignup = (e: React.FormEvent) => {
+  const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
+    setSignupErrors({});
+    
     if (signupPassword !== signupConfirmPassword) {
+      setSignupErrors({ password: ["Passwords do not match"] });
       toast.error("Passwords do not match!");
       return;
     }
-    signup(signupName, signupEmail, signupPassword);
-    toast.success("Account created successfully!");
-    onOpenChange(false);
+    
+    setSignupLoading(true);
+    
+    const result = await signup({
+      username: signupUsername,
+      email: signupEmail,
+      password: signupPassword,
+      password_confirm: signupConfirmPassword,
+      first_name: signupFirstName,
+      last_name: signupLastName,
+      phone_number: signupPhone || undefined,
+      role: signupRole,
+    });
+    
+    setSignupLoading(false);
+    
+    if (result.success) {
+      toast.success("Account created successfully!");
+      onOpenChange(false);
+      // Reset form
+      setSignupUsername("");
+      setSignupFirstName("");
+      setSignupLastName("");
+      setSignupEmail("");
+      setSignupPhone("");
+      setSignupPassword("");
+      setSignupConfirmPassword("");
+      setSignupRole("buyer");
+    } else {
+      setSignupErrors(result.errors || {});
+      const firstError = Object.values(result.errors || {})[0]?.[0];
+      toast.error(firstError || "Registration failed");
+    }
   };
 
   return (
@@ -166,19 +223,45 @@ export function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
 
           {/* Signup Form */}
           <TabsContent value="signup">
-            <form onSubmit={handleSignup} className="space-y-4 mt-4">
+            <form onSubmit={handleSignup} className="space-y-3 mt-4">
               <div className="space-y-2">
-                <Label htmlFor="signup-name">Full Name</Label>
+                <Label htmlFor="signup-username">Username</Label>
                 <div className="relative">
                   <User className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
                   <Input
-                    id="signup-name"
+                    id="signup-username"
                     type="text"
-                    placeholder="Your full name"
+                    placeholder="username"
                     className="pl-10"
                     required
-                    value={signupName}
-                    onChange={(e) => setSignupName(e.target.value)}
+                    value={signupUsername}
+                    onChange={(e) => setSignupUsername(e.target.value)}
+                  />
+                </div>
+                {signupErrors.username && (
+                  <p className="text-xs text-red-600">{signupErrors.username[0]}</p>
+                )}
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-2">
+                  <Label htmlFor="signup-firstname">First Name</Label>
+                  <Input
+                    id="signup-firstname"
+                    type="text"
+                    placeholder="First"
+                    value={signupFirstName}
+                    onChange={(e) => setSignupFirstName(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="signup-lastname">Last Name</Label>
+                  <Input
+                    id="signup-lastname"
+                    type="text"
+                    placeholder="Last"
+                    value={signupLastName}
+                    onChange={(e) => setSignupLastName(e.target.value)}
                   />
                 </div>
               </div>
@@ -195,6 +278,24 @@ export function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
                     required
                     value={signupEmail}
                     onChange={(e) => setSignupEmail(e.target.value)}
+                  />
+                </div>
+                {signupErrors.email && (
+                  <p className="text-xs text-red-600">{signupErrors.email[0]}</p>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="signup-phone">Phone (Optional)</Label>
+                <div className="relative">
+                  <Phone className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                  <Input
+                    id="signup-phone"
+                    type="tel"
+                    placeholder="+923001234567"
+                    className="pl-10"
+                    value={signupPhone}
+                    onChange={(e) => setSignupPhone(e.target.value)}
                   />
                 </div>
               </div>
@@ -224,6 +325,9 @@ export function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
                     )}
                   </button>
                 </div>
+                {signupErrors.password && (
+                  <p className="text-xs text-red-600">{signupErrors.password[0]}</p>
+                )}
               </div>
 
               <div className="space-y-2">
@@ -253,6 +357,20 @@ export function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
                 </div>
               </div>
 
+              <div className="space-y-2">
+                <Label htmlFor="signup-role">Account Type</Label>
+                <select
+                  id="signup-role"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  value={signupRole}
+                  onChange={(e) => setSignupRole(e.target.value as UserRole)}
+                >
+                  <option value="buyer">Buyer - I want to purchase items</option>
+                  <option value="seller">Seller - I want to sell items</option>
+                  <option value="both">Both - I want to buy and sell</option>
+                </select>
+              </div>
+
               <label className="flex items-start gap-2 cursor-pointer text-sm">
                 <input type="checkbox" className="mt-0.5 rounded border-gray-300" required />
                 <span className="text-gray-600">
@@ -267,8 +385,25 @@ export function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
                 </span>
               </label>
 
-              <Button type="submit" className="w-full bg-emerald-700 hover:bg-emerald-800">
-                Create Account
+              {signupErrors.general && (
+                <div className="text-sm text-red-600 bg-red-50 p-2 rounded">
+                  {signupErrors.general[0]}
+                </div>
+              )}
+
+              <Button 
+                type="submit" 
+                className="w-full bg-emerald-700 hover:bg-emerald-800"
+                disabled={signupLoading}
+              >
+                {signupLoading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Creating Account...
+                  </>
+                ) : (
+                  "Create Account"
+                )}
               </Button>
 
               <div className="relative my-4">

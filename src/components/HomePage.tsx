@@ -1,5 +1,6 @@
 import { Hero } from "./Hero";
 import { FeaturedProducts } from "./FeaturedProducts";
+import { NewAuctions } from "./NewAuctions";
 import { Categories } from "./Categories";
 import { Heritage } from "./Heritage";
 import { Newsletter } from "./Newsletter";
@@ -13,6 +14,7 @@ export function HomePage({ onNavigate }: HomePageProps) {
     <>
       <Hero onNavigate={onNavigate as any} />
       <FeaturedProducts onNavigate={onNavigate} />
+      <NewAuctions onNavigate={onNavigate} />
       <Categories onNavigate={onNavigate} />
       <Heritage />
       <Newsletter />

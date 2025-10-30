@@ -7,7 +7,7 @@ import { Label } from "./ui/label";
 import { Separator } from "./ui/separator";
 import { User, MapPin, Heart, Package, LogOut, Mail, Phone, Store } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
-import { toast } from "sonner@2.0.3";
+import { toast } from "sonner";
 import { SellerRegistrationForm, SellerData } from "./SellerRegistrationForm";
 
 interface MyAccountPanelProps {
@@ -30,9 +30,10 @@ export function MyAccountPanel({
   const { user, logout, updateProfile, isSeller, becomeSeller } = useAuth();
   const [currentView, setCurrentView] = useState<AccountView>("menu");
   const [editMode, setEditMode] = useState(false);
-  const [fullName, setFullName] = useState(user?.name || "");
+  const [firstName, setFirstName] = useState(user?.first_name || "");
+  const [lastName, setLastName] = useState(user?.last_name || "");
   const [email, setEmail] = useState(user?.email || "");
-  const [phone, setPhone] = useState(user?.phone || "");
+  const [phone, setPhone] = useState(user?.phone_number || "");
   const [showSellerRegistration, setShowSellerRegistration] = useState(false);
 
   // Mock orders data
@@ -64,7 +65,12 @@ export function MyAccountPanel({
   ];
 
   const handleSaveProfile = () => {
-    updateProfile({ name: fullName, email, phone });
+    updateProfile({ 
+      first_name: firstName, 
+      last_name: lastName, 
+      email, 
+      phone_number: phone 
+    });
     setEditMode(false);
     toast.success("Profile updated successfully!");
   };
@@ -103,13 +109,19 @@ export function MyAccountPanel({
     }, 1000);
   };
 
-  const getInitials = (name: string) => {
-    return name
-      .split(" ")
-      .map((n) => n[0])
-      .join("")
-      .toUpperCase()
-      .slice(0, 2);
+  const getInitials = (firstName?: string, lastName?: string) => {
+    if (!firstName && !lastName) return "U";
+    const first = firstName?.[0] || "";
+    const last = lastName?.[0] || "";
+    return (first + last).toUpperCase() || "U";
+  };
+
+  const getUserDisplayName = () => {
+    if (!user) return "User";
+    if (user.first_name || user.last_name) {
+      return `${user.first_name || ""} ${user.last_name || ""}`.trim();
+    }
+    return user.username;
   };
 
   const renderMenu = () => (
@@ -118,10 +130,10 @@ export function MyAccountPanel({
       <div className="flex flex-col items-center py-8 border-b flex-shrink-0">
         <Avatar className="h-20 w-20 mb-4 bg-emerald-700">
           <AvatarFallback className="text-white text-2xl">
-            {user ? getInitials(user.name) : "U"}
+            {user ? getInitials(user.first_name, user.last_name) : "U"}
           </AvatarFallback>
         </Avatar>
-        <h3 className="text-gray-900 mb-1">{user?.name}</h3>
+        <h3 className="text-gray-900 mb-1">{getUserDisplayName()}</h3>
         <p className="text-sm text-gray-600">{user?.email}</p>
       </div>
 
@@ -206,18 +218,29 @@ export function MyAccountPanel({
         <div className="flex justify-center mb-6">
           <Avatar className="h-24 w-24 bg-emerald-700">
             <AvatarFallback className="text-white text-3xl">
-              {user ? getInitials(user.name) : "U"}
+              {user ? getInitials(user.first_name, user.last_name) : "U"}
             </AvatarFallback>
           </Avatar>
         </div>
 
         <div className="space-y-4">
           <div>
-            <Label htmlFor="fullName" className="text-gray-700">Full Name</Label>
+            <Label htmlFor="firstName" className="text-gray-700">First Name</Label>
             <Input
-              id="fullName"
-              value={fullName}
-              onChange={(e) => setFullName(e.target.value)}
+              id="firstName"
+              value={firstName}
+              onChange={(e) => setFirstName(e.target.value)}
+              disabled={!editMode}
+              className="mt-1"
+            />
+          </div>
+
+          <div>
+            <Label htmlFor="lastName" className="text-gray-700">Last Name</Label>
+            <Input
+              id="lastName"
+              value={lastName}
+              onChange={(e) => setLastName(e.target.value)}
               disabled={!editMode}
               className="mt-1"
             />
@@ -240,19 +263,16 @@ export function MyAccountPanel({
 
           <div>
             <Label htmlFor="phone" className="text-gray-700">Phone Number</Label>
-            <div className="flex gap-2 mt-1">
-              <div className="flex items-center gap-2 px-3 border rounded-md bg-gray-50 w-20">
-                <span className="text-lg">🇵🇰</span>
-                <span className="text-sm text-gray-600">+92</span>
-              </div>
+            <div className="relative mt-1">
+              <Phone className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
               <Input
                 id="phone"
                 type="tel"
-                placeholder="300 1234567"
-                value={phone?.replace("+92 ", "") || ""}
-                onChange={(e) => setPhone(`+92 ${e.target.value}`)}
+                placeholder="+923001234567"
+                value={phone || ""}
+                onChange={(e) => setPhone(e.target.value)}
                 disabled={!editMode}
-                className="flex-1"
+                className="pl-10"
               />
             </div>
           </div>
@@ -269,9 +289,10 @@ export function MyAccountPanel({
             <Button
               onClick={() => {
                 setEditMode(false);
-                setFullName(user?.name || "");
+                setFirstName(user?.first_name || "");
+                setLastName(user?.last_name || "");
                 setEmail(user?.email || "");
-                setPhone(user?.phone || "");
+                setPhone(user?.phone_number || "");
               }}
               variant="outline"
               className="flex-1"
