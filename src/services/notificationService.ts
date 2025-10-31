@@ -105,47 +105,4 @@ export const notificationService = {
     );
     return response.data;
   },
-
-  /**
-   * Connect to WebSocket for real-time notifications
-   * WebSocket: ws://localhost:8000/ws/notifications/
-   */
-  connectWebSocket: (
-    token: string,
-    onMessage: (notification: Notification) => void,
-    onError?: (error: Event) => void,
-    onClose?: () => void
-  ): WebSocket => {
-    const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsUrl = `${wsProtocol}//${window.location.hostname}:8000/ws/notifications/?token=${token}`;
-    
-    const ws = new WebSocket(wsUrl);
-    
-    ws.onopen = () => {
-      console.log('Notification WebSocket connected');
-    };
-    
-    ws.onmessage = (event) => {
-      try {
-        const data = JSON.parse(event.data);
-        if (data.type === 'notification') {
-          onMessage(data.notification);
-        }
-      } catch (error) {
-        console.error('Failed to parse WebSocket message:', error);
-      }
-    };
-    
-    ws.onerror = (error) => {
-      console.error('Notification WebSocket error:', error);
-      if (onError) onError(error);
-    };
-    
-    ws.onclose = () => {
-      console.log('Notification WebSocket disconnected');
-      if (onClose) onClose();
-    };
-    
-    return ws;
-  },
 };

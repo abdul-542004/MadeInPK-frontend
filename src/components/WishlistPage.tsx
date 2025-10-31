@@ -84,7 +84,7 @@ export function WishlistPage({ onProductClick, onContinueShopping }: WishlistPag
           <div className="bg-white rounded-lg shadow-sm p-6">
             <div className="space-y-4">
               {wishlistItems.map((item) => {
-                const price = item.price.price || item.price.current_price || '0';
+                const price = item.price ? (item.price.price || item.price.current_price || '0') : '0';
                 const priceNum = parseFloat(price);
 
                 return (
@@ -133,7 +133,7 @@ export function WishlistPage({ onProductClick, onContinueShopping }: WishlistPag
 
                         <div className="flex items-center gap-2 mb-3">
                           <span className="text-xs text-emerald-700">{item.category}</span>
-                          {item.listing_type === 'auction' && item.price.starting_price && (
+                          {item.listing_type === 'auction' && item.price && item.price.starting_price && (
                             <>
                               <span className="text-xs text-gray-400">•</span>
                               <span className="text-xs text-gray-600">Starting Bid</span>
@@ -145,7 +145,7 @@ export function WishlistPage({ onProductClick, onContinueShopping }: WishlistPag
                           <span className="text-emerald-700">
                             Rs. {priceNum.toLocaleString()}
                           </span>
-                          {item.listing_type === 'auction' && item.price.starting_price && (
+                          {item.listing_type === 'auction' && item.price && item.price.starting_price && (
                             <span className="text-sm text-gray-500">
                               (from Rs. {parseFloat(item.price.starting_price).toLocaleString()})
                             </span>

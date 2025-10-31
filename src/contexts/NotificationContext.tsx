@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, ReactNode, useRef } from "react";
+import { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import { useAuth } from "./AuthContext";
 import { 
   notificationService, 
@@ -38,67 +38,15 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
   const { isAuthenticated, user } = useAuth();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(false);
-  const wsRef = useRef<WebSocket | null>(null);
 
-  // Load notifications and connect WebSocket on mount
+  // Load notifications on mount
   useEffect(() => {
     if (MOCK_MODE || isAuthenticated) {
       refreshNotifications();
-      
-      // Connect WebSocket for real-time notifications (only in backend mode)
-      if (!MOCK_MODE && isAuthenticated) {
-        const token = localStorage.getItem('authToken');
-        if (token) {
-          connectWebSocket(token);
-        }
-      }
     } else {
       setNotifications([]);
-      disconnectWebSocket();
     }
-
-    return () => {
-      disconnectWebSocket();
-    };
   }, [isAuthenticated]);
-
-  const connectWebSocket = (token: string) => {
-    try {
-      wsRef.current = notificationService.connectWebSocket(
-        token,
-        (notification) => {
-          // Add new notification from WebSocket
-          setNotifications((prev) => [notification, ...prev]);
-          // Show toast
-          toast.info(notification.title, {
-            description: notification.message,
-          });
-        },
-        (error) => {
-          console.error('WebSocket error:', error);
-        },
-        () => {
-          console.log('WebSocket closed, attempting to reconnect...');
-          // Reconnect after 5 seconds
-          setTimeout(() => {
-            const token = localStorage.getItem('authToken');
-            if (token && isAuthenticated) {
-              connectWebSocket(token);
-            }
-          }, 5000);
-        }
-      );
-    } catch (error) {
-      console.error('Failed to connect WebSocket:', error);
-    }
-  };
-
-  const disconnectWebSocket = () => {
-    if (wsRef.current) {
-      wsRef.current.close();
-      wsRef.current = null;
-    }
-  };
 
   const refreshNotifications = async () => {
     if (!isAuthenticated && !MOCK_MODE) return;

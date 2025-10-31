@@ -61,7 +61,8 @@ export function SellerDashboard({ onNavigate }: SellerDashboardProps) {
     { id: "settings" as SellerView, label: "Settings", icon: Settings },
   ];
 
-  const getInitials = (name: string) => {
+  const getInitials = (firstName?: string, lastName?: string) => {
+    const name = [firstName, lastName].filter(Boolean).join(' ') || 'User';
     return name
       .split(" ")
       .map((n) => n[0])
@@ -144,10 +145,12 @@ export function SellerDashboard({ onNavigate }: SellerDashboardProps) {
                 <button className="flex items-center gap-2 hover:bg-gray-50 rounded-lg px-2 py-1">
                   <Avatar className="h-8 w-8 bg-emerald-700">
                     <AvatarFallback className="text-white text-sm">
-                      {user ? getInitials(user.name) : "U"}
+                      {user ? getInitials(user.first_name, user.last_name) : "U"}
                     </AvatarFallback>
                   </Avatar>
-                  <span className="hidden sm:inline text-sm text-gray-700">{user?.name}</span>
+                  <span className="hidden sm:inline text-sm text-gray-700">
+                    {user ? `${user.first_name} ${user.last_name}`.trim() || user.username : ''}
+                  </span>
                 </button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-56">

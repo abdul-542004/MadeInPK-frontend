@@ -158,7 +158,7 @@ export function AddressPanel({ open, onOpenChange }: AddressPanelProps) {
                 className="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-emerald-500"
               >
                 <option value={0}>Select Province</option>
-                {provinces.map((prov) => (
+                {Array.isArray(provinces) && provinces.map((prov) => (
                   <option key={prov.id} value={prov.id}>
                     {prov.name}
                   </option>
@@ -179,7 +179,7 @@ export function AddressPanel({ open, onOpenChange }: AddressPanelProps) {
                 disabled={!formData.province}
               >
                 <option value={0}>Select City</option>
-                {cities.map((city) => (
+                {Array.isArray(cities) && cities.map((city) => (
                   <option key={city.id} value={city.id}>
                     {city.name}
                   </option>
