@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import { 
   DollarSign, 
   Users, 
@@ -9,13 +10,56 @@ import {
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../ui/card";
 import { Badge } from "../ui/badge";
+import { adminService } from "../../services/adminService";
+import { MOCK_MODE } from "../../lib/mockMode";
+import { toast } from "sonner";
 
 export function AdminAnalytics() {
-  // Mock stats data
+  const [statistics, setStatistics] = useState({
+    total_users: 0,
+    total_sellers: 0,
+    total_products: 0,
+    total_orders: 0,
+    total_revenue: '0.00',
+  });
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    loadStatistics();
+  }, []);
+
+  const loadStatistics = async () => {
+    if (MOCK_MODE) {
+      // Use mock data
+      setStatistics({
+        total_users: 8547,
+        total_sellers: 234,
+        total_products: 3456,
+        total_orders: 1847,
+        total_revenue: '12345678.00',
+      });
+      setLoading(false);
+      return;
+    }
+
+    // Backend mode
+    try {
+      setLoading(true);
+      const stats = await adminService.getStatistics();
+      setStatistics(stats);
+    } catch (error: any) {
+      console.error('Error loading admin statistics:', error);
+      toast.error(error.response?.data?.message || 'Failed to load statistics');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Mock stats data with backend values
   const stats = [
     {
       title: "Total Revenue",
-      value: "PKR 12,345,678",
+      value: `PKR ${parseFloat(statistics.total_revenue).toLocaleString()}`,
       change: "+12.5%",
       trend: "up",
       icon: DollarSign,
@@ -24,7 +68,7 @@ export function AdminAnalytics() {
     },
     {
       title: "Total Users",
-      value: "8,547",
+      value: statistics.total_users.toLocaleString(),
       change: "+18.2%",
       trend: "up",
       icon: Users,
@@ -33,7 +77,7 @@ export function AdminAnalytics() {
     },
     {
       title: "Active Sellers",
-      value: "234",
+      value: statistics.total_sellers.toString(),
       change: "+5.4%",
       trend: "up",
       icon: Activity,
@@ -42,7 +86,7 @@ export function AdminAnalytics() {
     },
     {
       title: "Total Products",
-      value: "3,456",
+      value: statistics.total_products.toLocaleString(),
       change: "+23",
       trend: "up",
       icon: Package,
@@ -51,7 +95,7 @@ export function AdminAnalytics() {
     },
     {
       title: "Total Orders",
-      value: "1,847",
+      value: statistics.total_orders.toLocaleString(),
       change: "+8.9%",
       trend: "up",
       icon: ShoppingBag,
@@ -60,7 +104,7 @@ export function AdminAnalytics() {
     },
     {
       title: "Pending Approvals",
-      value: "47",
+      value: "47", // Static for now, would need separate endpoint
       change: "-12%",
       trend: "down",
       icon: TrendingDown,

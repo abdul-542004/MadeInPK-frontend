@@ -1,13 +1,18 @@
 import { useState, useEffect } from "react";
-import { Search, X } from "lucide-react";
+import { Search, X, Loader2 } from "lucide-react";
 import { Dialog, DialogContent } from "./ui/dialog";
-import { mockProducts, Product } from "../data/mockProducts";
+import { Product, mockProducts } from "../data/mockProducts";
+import { FixedPriceListing } from "../types/product";
 import { ImageWithFallback } from "./figma/ImageWithFallback";
+import { productService } from "../services/productService";
+import { toast } from "sonner";
+import { MOCK_MODE, mockDelay } from "../lib/mockMode";
 
 interface SearchDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onProductSelect?: (product: Product) => void;
+  onListingSelect?: (listing: FixedPriceListing) => void;
   onNavigateToProducts?: () => void;
   onSearchSubmit?: (query: string) => void;
 }
@@ -16,33 +21,69 @@ export function SearchDialog({
   open, 
   onOpenChange, 
   onProductSelect,
+  onListingSelect,
   onNavigateToProducts,
   onSearchSubmit
 }: SearchDialogProps) {
   const [searchQuery, setSearchQuery] = useState("");
-  const [searchResults, setSearchResults] = useState<Product[]>([]);
+  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
 
+  // Debounced search effect
   useEffect(() => {
     if (searchQuery.trim() === "") {
       setSearchResults([]);
       return;
     }
 
-    const query = searchQuery.toLowerCase();
-    const results = mockProducts.filter((product) => {
-      return (
-        product.name.toLowerCase().includes(query) ||
-        product.category.toLowerCase().includes(query) ||
-        product.description.toLowerCase().includes(query)
-      );
-    });
+    const timer = setTimeout(async () => {
+      try {
+        setLoading(true);
+        
+        if (MOCK_MODE) {
+          // Use mock data when backend is not available
+          await mockDelay(300);
+          const query = searchQuery.toLowerCase();
+          const results = mockProducts.filter((product) => {
+            return (
+              product.name.toLowerCase().includes(query) ||
+              product.category.toLowerCase().includes(query) ||
+              product.description.toLowerCase().includes(query)
+            );
+          });
+          setSearchResults(results);
+        } else {
+          // Use backend API
+          const response = await productService.getFixedPriceListings({
+            search: searchQuery.trim(),
+            page_size: 10,
+          });
+          setSearchResults(response.results);
+        }
+      } catch (error) {
+        console.error('Search failed:', error);
+        toast.error('Search failed - using mock data');
+        // Fallback to mock data on error
+        const query = searchQuery.toLowerCase();
+        const results = mockProducts.filter((product) => {
+          return (
+            product.name.toLowerCase().includes(query) ||
+            product.category.toLowerCase().includes(query) ||
+            product.description.toLowerCase().includes(query)
+          );
+        });
+        setSearchResults(results);
+      } finally {
+        setLoading(false);
+      }
+    }, 300); // 300ms debounce
 
-    setSearchResults(results);
+    return () => clearTimeout(timer);
   }, [searchQuery]);
 
-  const handleProductClick = (product: Product) => {
-    if (onProductSelect) {
-      onProductSelect(product);
+  const handleListingClick = (listing: FixedPriceListing) => {
+    if (onListingSelect) {
+      onListingSelect(listing);
       onOpenChange(false);
       setSearchQuery("");
     }
@@ -83,7 +124,7 @@ export function SearchDialog({
       <DialogContent className="max-w-2xl p-0 gap-0 overflow-hidden">
         {/* Search Input */}
         <div className="flex items-center gap-3 p-4 border-b">
-          <Search className="h-5 w-5 text-gray-400 flex-shrink-0" />
+          <Search className="h-5 w-5 text-gray-400 shrink-0" />
           <input
             type="text"
             placeholder="Search products, categories... (Press Enter to see all results)"
@@ -121,6 +162,10 @@ export function SearchDialog({
                 </span>
               </div>
             </div>
+          ) : loading ? (
+            <div className="p-8 flex items-center justify-center">
+              <Loader2 className="h-8 w-8 animate-spin text-emerald-700" />
+            </div>
           ) : searchResults.length === 0 ? (
             <div className="p-8 text-center text-gray-500">
               <p className="mb-2">No products found for "{searchQuery}"</p>
@@ -148,32 +193,50 @@ export function SearchDialog({
                 )}
               </div>
               <div className="divide-y">
-                {searchResults.map((product) => (
-                  <button
-                    key={product.id}
-                    onClick={() => handleProductClick(product)}
-                    className="w-full p-4 flex gap-4 hover:bg-gray-50 transition-colors text-left"
-                  >
-                    <div className="w-16 h-16 flex-shrink-0 rounded-md overflow-hidden bg-gray-100">
-                      <ImageWithFallback
-                        src={product.image}
-                        alt={product.name}
-                        className="w-full h-full object-cover"
-                      />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <h4 className="text-gray-900 truncate mb-1">
-                        {product.name}
-                      </h4>
-                      <p className="text-sm text-gray-500 mb-1">
-                        {product.category}
-                      </p>
-                      <p className="text-emerald-700">
-                        Rs. {product.price.toLocaleString()}
-                      </p>
-                    </div>
-                  </button>
-                ))}
+                {searchResults.map((item) => {
+                  // Handle both mock Product and backend FixedPriceListing
+                  const isMockProduct = 'name' in item;
+                  const id = item.id;
+                  const image = isMockProduct ? item.image : item.product.images?.[0]?.image_url || '';
+                  const name = isMockProduct ? item.name : item.product.name;
+                  const category = isMockProduct ? item.category : item.product.category_name;
+                  const price = isMockProduct ? item.price : parseFloat(item.price);
+                  
+                  return (
+                    <button
+                      key={id}
+                      onClick={() => {
+                        if (isMockProduct && onProductSelect) {
+                          onProductSelect(item);
+                        } else if (!isMockProduct && onListingSelect) {
+                          onListingSelect(item);
+                        }
+                        onOpenChange(false);
+                        setSearchQuery("");
+                      }}
+                      className="w-full p-4 flex gap-4 hover:bg-gray-50 transition-colors text-left"
+                    >
+                      <div className="w-16 h-16 shrink-0 rounded-md overflow-hidden bg-gray-100">
+                        <ImageWithFallback
+                          src={image}
+                          alt={name}
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <h4 className="text-gray-900 truncate mb-1">
+                          {name}
+                        </h4>
+                        <p className="text-sm text-gray-500 mb-1">
+                          {category}
+                        </p>
+                        <p className="text-emerald-700">
+                          Rs. {price.toLocaleString()}
+                        </p>
+                      </div>
+                    </button>
+                  );
+                })}
               </div>
               {searchResults.length > 5 && (
                 <div className="p-4 border-t bg-gray-50">

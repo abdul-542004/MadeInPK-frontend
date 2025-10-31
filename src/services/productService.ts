@@ -1,7 +1,8 @@
 import apiClient from '../lib/apiClient';
 import { 
   Product, 
-  Auction, 
+  Auction,
+  Bid, 
   FixedPriceListing,
   PaginatedResponse,
   ProductFilters,
@@ -117,5 +118,17 @@ export const productService = {
       page_size: limit,
     });
     return response.results;
+  },
+
+  /**
+   * Place a bid on an auction
+   * POST /api/auctions/{id}/place_bid/
+   */
+  placeBid: async (auctionId: number, amount: number): Promise<Bid> => {
+    const response = await apiClient.post<Bid>(
+      `/auctions/${auctionId}/place_bid/`,
+      { amount }
+    );
+    return response.data;
   },
 };

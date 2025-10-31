@@ -10,7 +10,10 @@ import { FixedPriceListing } from "../types/product";
 import { ProductCard } from "./ProductCard";
 import { useWishlist } from "../contexts/WishlistContext";
 import { useCart } from "../contexts/CartContext";
+import { useAuth } from "../contexts/AuthContext";
 import { productService } from "../services/productService";
+import { reviewService, ProductReview, CreateReviewRequest } from "../services/reviewService";
+import { MOCK_MODE } from "../lib/mockMode";
 import { toast } from "sonner";
 
 interface ProductDetailPageProps {
@@ -30,6 +33,17 @@ export function ProductDetailPage({ product: propProduct, listing: propListing, 
   const [quantity, setQuantity] = useState(1);
   const { toggleWishlist, isInWishlist } = useWishlist();
   const { addToCart } = useCart();
+  const { user, isAuthenticated } = useAuth();
+  
+  // Review state
+  const [reviews, setReviews] = useState<ProductReview[]>([]);
+  const [loadingReviews, setLoadingReviews] = useState(false);
+  const [submittingReview, setSubmittingReview] = useState(false);
+  const [reviewForm, setReviewForm] = useState({
+    rating: 5,
+    title: '',
+    comment: ''
+  });
 
   // Load listing from backend if ID provided in URL
   useEffect(() => {
@@ -90,6 +104,137 @@ export function ProductDetailPage({ product: propProduct, listing: propListing, 
   const productId = listing ? listing.id : product?.id || 0;
   const isWishlisted = isInWishlist(productId);
 
+  // Load reviews
+  const loadReviews = async () => {
+    if (!productId) return;
+    
+    try {
+      setLoadingReviews(true);
+      
+      if (MOCK_MODE) {
+        // Mock reviews
+        const mockReviews: ProductReview[] = [
+          {
+            id: 1,
+            product: productId,
+            product_name: displayProduct?.name || '',
+            buyer: 1,
+            buyer_username: 'Ayesha K.',
+            order: 101,
+            rating: 5,
+            title: 'Excellent Quality!',
+            comment: 'Beautiful craftsmanship and authentic design. Exactly as described and arrived in perfect condition. Highly recommend!',
+            is_verified_purchase: true,
+            created_at: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
+            updated_at: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
+          },
+          {
+            id: 2,
+            product: productId,
+            product_name: displayProduct?.name || '',
+            buyer: 2,
+            buyer_username: 'Ahmed R.',
+            order: 102,
+            rating: 4,
+            title: 'Great Purchase',
+            comment: 'Love the traditional design and quality. Fast shipping too! Would definitely buy again.',
+            is_verified_purchase: true,
+            created_at: new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString(),
+            updated_at: new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString(),
+          },
+          {
+            id: 3,
+            product: productId,
+            product_name: displayProduct?.name || '',
+            buyer: 3,
+            buyer_username: 'Fatima S.',
+            order: 103,
+            rating: 5,
+            title: 'Highly Satisfied',
+            comment: 'Authentic Pakistani craftsmanship at its finest. The attention to detail is remarkable. Perfect addition to my home!',
+            is_verified_purchase: true,
+            created_at: new Date(Date.now() - 21 * 24 * 60 * 60 * 1000).toISOString(),
+            updated_at: new Date(Date.now() - 21 * 24 * 60 * 60 * 1000).toISOString(),
+          },
+        ];
+        setReviews(mockReviews);
+      } else {
+        const reviewsData = await reviewService.getProductReviews(productId);
+        setReviews(reviewsData);
+      }
+    } catch (error) {
+      console.error('Failed to load reviews:', error);
+      // Silently fail for reviews, not critical
+    } finally {
+      setLoadingReviews(false);
+    }
+  };
+
+  useEffect(() => {
+    loadReviews();
+  }, [productId]);
+
+  // Submit review
+  const handleSubmitReview = async () => {
+    if (!isAuthenticated) {
+      toast.error('Please login to submit a review');
+      return;
+    }
+
+    if (!reviewForm.title.trim() || !reviewForm.comment.trim()) {
+      toast.error('Please fill in all review fields');
+      return;
+    }
+
+    if (!productId) return;
+
+    try {
+      setSubmittingReview(true);
+
+      if (MOCK_MODE) {
+        // Mock review submission
+        const newReview: ProductReview = {
+          id: reviews.length + 1,
+          product: productId,
+          product_name: displayProduct?.name || '',
+          buyer: user?.id || 0,
+          buyer_username: user?.username || 'Anonymous',
+          order: null,
+          rating: reviewForm.rating,
+          title: reviewForm.title,
+          comment: reviewForm.comment,
+          is_verified_purchase: false,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        };
+        setReviews([newReview, ...reviews]);
+        toast.success('Review submitted successfully!');
+      } else {
+        const reviewData: CreateReviewRequest = {
+          product: productId,
+          rating: reviewForm.rating,
+          title: reviewForm.title,
+          comment: reviewForm.comment,
+        };
+        await reviewService.createProductReview(reviewData);
+        toast.success('Review submitted successfully!');
+        await loadReviews();
+      }
+
+      // Reset form
+      setReviewForm({
+        rating: 5,
+        title: '',
+        comment: '',
+      });
+    } catch (error: any) {
+      console.error('Failed to submit review:', error);
+      toast.error(error.response?.data?.message || 'Failed to submit review');
+    } finally {
+      setSubmittingReview(false);
+    }
+  };
+
   // Images
   const productImages = isBackendListing 
     ? (backendProduct?.images || [])
@@ -112,10 +257,10 @@ export function ProductDetailPage({ product: propProduct, listing: propListing, 
   };
 
   const handleWishlistClick = () => {
-    if (product) {
-      toggleWishlist(product);
+    if (productId) {
+      toggleWishlist(productId);
     } else {
-      toast.info("Wishlist feature coming soon for backend products!");
+      toast.info("Cannot add to wishlist!");
     }
   };
 
@@ -415,7 +560,7 @@ export function ProductDetailPage({ product: propProduct, listing: propListing, 
                   Description
                 </TabsTrigger>
                 <TabsTrigger value="reviews" className="flex-1 sm:flex-none">
-                  Reviews ({isBackendListing ? (backendProduct?.total_reviews || 0) : (product?.reviews || 0)})
+                  Reviews ({loadingReviews ? '...' : reviews.length})
                 </TabsTrigger>
                 <TabsTrigger value="artisan" className="flex-1 sm:flex-none">
                   {isBackendListing ? 'Seller Info' : 'Artisan Info'}
@@ -456,69 +601,149 @@ export function ProductDetailPage({ product: propProduct, listing: propListing, 
 
               <TabsContent value="reviews" className="mt-6">
                 <div className="space-y-6">
-                  <div className="flex items-start gap-4 p-4 bg-gray-50 rounded-lg">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-2">
-                        <div className="flex items-center gap-1">
-                          {Array.from({ length: 5 }).map((_, i) => (
-                            <Star
-                              key={i}
-                              className="h-4 w-4 fill-yellow-400 text-yellow-400"
-                            />
-                          ))}
+                  {/* Review Submission Form */}
+                  {isAuthenticated ? (
+                    <div className="p-6 bg-gray-50 rounded-lg border border-gray-200">
+                      <h4 className="text-lg font-semibold text-gray-900 mb-4">Write a Review</h4>
+                      <div className="space-y-4">
+                        {/* Rating */}
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Rating
+                          </label>
+                          <div className="flex items-center gap-2">
+                            {Array.from({ length: 5 }).map((_, i) => (
+                              <button
+                                key={i}
+                                type="button"
+                                onClick={() => setReviewForm({ ...reviewForm, rating: i + 1 })}
+                                className="focus:outline-none"
+                              >
+                                <Star
+                                  className={`h-6 w-6 transition-colors ${
+                                    i < reviewForm.rating
+                                      ? 'fill-yellow-400 text-yellow-400'
+                                      : 'fill-gray-200 text-gray-200'
+                                  }`}
+                                />
+                              </button>
+                            ))}
+                            <span className="ml-2 text-gray-600">
+                              {reviewForm.rating} {reviewForm.rating === 1 ? 'star' : 'stars'}
+                            </span>
+                          </div>
                         </div>
-                        <span className="text-gray-900">Excellent Quality!</span>
-                      </div>
-                      <p className="text-gray-600 mb-2">
-                        Beautiful craftsmanship and authentic design. Exactly as described and arrived in perfect condition. Highly recommend!
-                      </p>
-                      <p className="text-gray-500">- Ayesha K., Karachi</p>
-                    </div>
-                  </div>
 
-                  <div className="flex items-start gap-4 p-4 bg-gray-50 rounded-lg">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-2">
-                        <div className="flex items-center gap-1">
-                          {Array.from({ length: 5 }).map((_, i) => (
-                            <Star
-                              key={i}
-                              className={`h-4 w-4 ${
-                                i < 4
-                                  ? "fill-yellow-400 text-yellow-400"
-                                  : "fill-gray-200 text-gray-200"
-                              }`}
-                            />
-                          ))}
+                        {/* Title */}
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Review Title
+                          </label>
+                          <input
+                            type="text"
+                            value={reviewForm.title}
+                            onChange={(e) => setReviewForm({ ...reviewForm, title: e.target.value })}
+                            placeholder="e.g., Excellent Quality!"
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                            maxLength={100}
+                          />
                         </div>
-                        <span className="text-gray-900">Great Purchase</span>
-                      </div>
-                      <p className="text-gray-600 mb-2">
-                        Love the traditional design and quality. Fast shipping too! Would definitely buy again.
-                      </p>
-                      <p className="text-gray-500">- Ahmed R., Lahore</p>
-                    </div>
-                  </div>
 
-                  <div className="flex items-start gap-4 p-4 bg-gray-50 rounded-lg">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-2">
-                        <div className="flex items-center gap-1">
-                          {Array.from({ length: 5 }).map((_, i) => (
-                            <Star
-                              key={i}
-                              className="h-4 w-4 fill-yellow-400 text-yellow-400"
-                            />
-                          ))}
+                        {/* Comment */}
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Your Review
+                          </label>
+                          <textarea
+                            value={reviewForm.comment}
+                            onChange={(e) => setReviewForm({ ...reviewForm, comment: e.target.value })}
+                            placeholder="Tell us about your experience with this product..."
+                            rows={4}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-emerald-500 focus:border-transparent resize-none"
+                            maxLength={500}
+                          />
                         </div>
-                        <span className="text-gray-900">Highly Satisfied</span>
+
+                        {/* Submit Button */}
+                        <Button
+                          onClick={handleSubmitReview}
+                          disabled={submittingReview}
+                          className="bg-emerald-700 hover:bg-emerald-800"
+                        >
+                          {submittingReview ? (
+                            <>
+                              <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                              Submitting...
+                            </>
+                          ) : (
+                            'Submit Review'
+                          )}
+                        </Button>
                       </div>
-                      <p className="text-gray-600 mb-2">
-                        Authentic Pakistani craftsmanship at its finest. The attention to detail is remarkable. Perfect addition to my home!
-                      </p>
-                      <p className="text-gray-500">- Fatima S., Islamabad</p>
                     </div>
-                  </div>
+                  ) : (
+                    <div className="p-6 bg-gray-50 rounded-lg border border-gray-200 text-center">
+                      <p className="text-gray-600">
+                        Please <button className="text-emerald-700 font-medium hover:underline">login</button> to write a review
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Reviews List */}
+                  {loadingReviews ? (
+                    <div className="flex items-center justify-center py-8">
+                      <Loader2 className="h-6 w-6 animate-spin text-emerald-700" />
+                      <span className="ml-2 text-gray-600">Loading reviews...</span>
+                    </div>
+                  ) : reviews.length > 0 ? (
+                    <div className="space-y-4">
+                      <h4 className="text-lg font-semibold text-gray-900">
+                        Customer Reviews ({reviews.length})
+                      </h4>
+                      {reviews.map((review) => (
+                        <div key={review.id} className="flex items-start gap-4 p-4 bg-gray-50 rounded-lg">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-2">
+                              <div className="flex items-center gap-1">
+                                {Array.from({ length: 5 }).map((_, i) => (
+                                  <Star
+                                    key={i}
+                                    className={`h-4 w-4 ${
+                                      i < review.rating
+                                        ? 'fill-yellow-400 text-yellow-400'
+                                        : 'fill-gray-200 text-gray-200'
+                                    }`}
+                                  />
+                                ))}
+                              </div>
+                              <span className="text-gray-900 font-medium">{review.title}</span>
+                              {review.is_verified_purchase && (
+                                <Badge variant="outline" className="text-xs">
+                                  Verified Purchase
+                                </Badge>
+                              )}
+                            </div>
+                            <p className="text-gray-600 mb-2">{review.comment}</p>
+                            <div className="flex items-center gap-2 text-sm text-gray-500">
+                              <span>- {review.buyer_username}</span>
+                              <span>•</span>
+                              <span>
+                                {new Date(review.created_at).toLocaleDateString('en-US', {
+                                  year: 'numeric',
+                                  month: 'long',
+                                  day: 'numeric',
+                                })}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-8">
+                      <p className="text-gray-600">No reviews yet. Be the first to review this product!</p>
+                    </div>
+                  )}
                 </div>
               </TabsContent>
 

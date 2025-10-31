@@ -61,4 +61,76 @@ export const sellerService = {
     );
     return response.data;
   },
+
+  /**
+   * Get seller statistics and analytics
+   * GET /api/seller/statistics/
+   */
+  getSellerStatistics: async (): Promise<{
+    total_sales: number;
+    total_orders: number;
+    pending_orders: number;
+    total_revenue: string;
+    total_products: number;
+    active_auctions: number;
+  }> => {
+    const response = await apiClient.get('/seller/statistics/');
+    return response.data;
+  },
+
+  /**
+   * Get seller earnings breakdown
+   * GET /api/seller/earnings/
+   */
+  getSellerEarnings: async (filters?: {
+    start_date?: string;
+    end_date?: string;
+    status?: string;
+  }): Promise<{
+    total_earnings: string;
+    pending_earnings: string;
+    completed_earnings: string;
+    earnings_by_month: Array<{ month: string; amount: string }>;
+  }> => {
+    const params = new URLSearchParams();
+    
+    if (filters) {
+      Object.entries(filters).forEach(([key, value]) => {
+        if (value !== undefined && value !== null) {
+          params.append(key, value.toString());
+        }
+      });
+    }
+    
+    const response = await apiClient.get(
+      `/seller/earnings/?${params.toString()}`
+    );
+    return response.data;
+  },
+
+  /**
+   * Get seller's orders
+   * GET /api/seller/orders/
+   */
+  getSellerOrders: async (filters?: {
+    status?: string;
+    ordering?: string;
+    page?: number;
+    page_size?: number;
+  }): Promise<any> => {
+    const params = new URLSearchParams();
+    
+    if (filters) {
+      Object.entries(filters).forEach(([key, value]) => {
+        if (value !== undefined && value !== null) {
+          params.append(key, value.toString());
+        }
+      });
+    }
+    
+    const response = await apiClient.get(
+      `/seller/orders/?${params.toString()}`
+    );
+    return response.data;
+  },
 };

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Search, Edit, Trash2, Eye, MoreVertical } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
 import { Button } from "../ui/button";
@@ -30,16 +30,59 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "../ui/alert-dialog";
-import { toast } from "sonner@2.0.3";
+import { toast } from "sonner";
 import { useSeller, SellerProduct } from "../../contexts/SellerContext";
+import { productService } from "../../services/productService";
+import { MOCK_MODE } from "../../lib/mockMode";
+import { useAuth } from "../../contexts/AuthContext";
 
 interface SellerProductsProps {
   onAddProduct: () => void;
 }
 
 export function SellerProducts({ onAddProduct }: SellerProductsProps) {
-  const { products, updateProduct, deleteProduct } = useSeller();
+  const { user } = useAuth();
+  const { products: contextProducts, updateProduct, deleteProduct } = useSeller();
+  const [products, setProducts] = useState<SellerProduct[]>(contextProducts);
   const [searchQuery, setSearchQuery] = useState("");
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    loadProducts();
+  }, [user]);
+
+  const loadProducts = async () => {
+    if (MOCK_MODE || !user) {
+      // Use mock data from context
+      setProducts(contextProducts);
+      setLoading(false);
+      return;
+    }
+
+    // Backend mode
+    try {
+      setLoading(true);
+      const response = await productService.getProducts({ seller: user.id });
+      // Map backend products to SellerProduct format if needed
+      const mappedProducts = response.results.map(p => ({
+        id: p.id.toString(),
+        name: p.name,
+        price: parseFloat(p.listing_type === 'auction' ? '0' : '0'), // Would need price from listing
+        stock: 0, // Would need stock from listing
+        status: p.images.length > 0 ? 'Active' : 'Draft',
+        category: p.category_name,
+        image: p.images[0]?.image_url || '',
+      }));
+      setProducts(mappedProducts as any);
+    } catch (error: any) {
+      console.error('Error loading products:', error);
+      toast.error(error.response?.data?.message || 'Failed to load products');
+      // Fallback to context products
+      setProducts(contextProducts);
+    } finally {
+      setLoading(false);
+    }
+  };
   const [editingProduct, setEditingProduct] = useState<SellerProduct | null>(null);
   const [viewingProduct, setViewingProduct] = useState<SellerProduct | null>(null);
   const [deletingProductId, setDeletingProductId] = useState<string | null>(null);

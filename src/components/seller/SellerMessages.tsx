@@ -7,7 +7,7 @@ import { Textarea } from "../ui/textarea";
 import { Avatar, AvatarFallback } from "../ui/avatar";
 import { Badge } from "../ui/badge";
 import { useSeller } from "../../contexts/SellerContext";
-import { toast } from "sonner@2.0.3";
+import { toast } from "sonner";
 
 export function SellerMessages() {
   const { conversations, sendMessage, markConversationAsRead } = useSeller();

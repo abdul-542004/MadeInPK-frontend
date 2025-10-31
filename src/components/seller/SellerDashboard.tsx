@@ -28,7 +28,7 @@ import { SellerEarnings } from "./SellerEarnings";
 import { SellerMessages } from "./SellerMessages";
 import { SellerSettings } from "./SellerSettings";
 import SellerAuctions from "./SellerAuctions";
-import { toast } from "sonner@2.0.3";
+import { toast } from "sonner";
 import {
   DropdownMenu,
   DropdownMenuContent,

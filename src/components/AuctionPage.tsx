@@ -77,13 +77,13 @@ const AuctionPage: React.FC<AuctionPageProps> = ({ onAuctionClick }) => {
                 <Card 
                   key={auction.id} 
                   className="overflow-hidden hover:shadow-lg transition-all duration-300 cursor-pointer group border-2 hover:border-emerald-300"
-                  onClick={() => onAuctionClick?.(auction.id)}
+                  onClick={() => onAuctionClick?.(auction.id.toString())}
                 >
                   <div className="relative">
                     <div className="aspect-[4/3] overflow-hidden bg-gray-100">
                       <img
-                        src={auction.images[0]}
-                        alt={auction.productName}
+                        src={auction.product.images[0]?.image_url || auction.product.images[0]?.image || 'https://images.unsplash.com/photo-1586165368502-1bad197a6461?w=800'}
+                        alt={auction.product.name}
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                       />
                     </div>
@@ -94,31 +94,31 @@ const AuctionPage: React.FC<AuctionPageProps> = ({ onAuctionClick }) => {
                   </div>
 
                   <CardContent className="p-5">
-                    <h3 className="text-emerald-800 mb-2 line-clamp-1">{auction.productName}</h3>
-                    <p className="text-sm text-gray-500 mb-1">by {auction.sellerName}</p>
+                    <h3 className="text-emerald-800 mb-2 line-clamp-1">{auction.product.name}</h3>
+                    <p className="text-sm text-gray-500 mb-1">by {auction.product.seller_username}</p>
                     
                     <div className="grid grid-cols-2 gap-3 my-4 p-3 bg-emerald-50 rounded-lg">
                       <div>
                         <p className="text-xs text-gray-500">Base Price</p>
-                        <p className="text-emerald-700">Rs {auction.basePrice}</p>
+                        <p className="text-emerald-700">Rs {parseFloat(auction.starting_price).toLocaleString()}</p>
                       </div>
                       <div>
                         <p className="text-xs text-gray-500">Current Bid</p>
                         <p className="text-emerald-700 flex items-center gap-1">
                           <TrendingUp className="w-3 h-3" />
-                          Rs {auction.currentBid}
+                          Rs {parseFloat(auction.current_price).toLocaleString()}
                         </p>
                       </div>
                     </div>
 
                     <div className="flex items-center justify-between mb-4">
                       <div className="flex items-center gap-2">
-                        <Clock className={`w-4 h-4 ${getTimeColor(auction.endTime)}`} />
-                        <span className={`${getTimeColor(auction.endTime)}`}>
-                          {formatTimeRemaining(auction.endTime)} left
+                        <Clock className={`w-4 h-4 ${getTimeColor(new Date(auction.end_time).getTime())}`} />
+                        <span className={`${getTimeColor(new Date(auction.end_time).getTime())}`}>
+                          {formatTimeRemaining(new Date(auction.end_time).getTime())} left
                         </span>
                       </div>
-                      <span className="text-sm text-gray-500">{auction.bids.length} bids</span>
+                      <span className="text-sm text-gray-500">{auction.total_bids} bids</span>
                     </div>
 
                     <Button className="w-full bg-emerald-600 hover:bg-emerald-700 shadow-md">
@@ -146,13 +146,13 @@ const AuctionPage: React.FC<AuctionPageProps> = ({ onAuctionClick }) => {
                 <Card 
                   key={auction.id} 
                   className="overflow-hidden opacity-75 hover:opacity-100 transition-opacity cursor-pointer"
-                  onClick={() => onAuctionClick?.(auction.id)}
+                  onClick={() => onAuctionClick?.(auction.id.toString())}
                 >
                   <div className="relative">
                     <div className="aspect-[4/3] overflow-hidden bg-gray-100">
                       <img
-                        src={auction.images[0]}
-                        alt={auction.productName}
+                        src={auction.product.images[0]?.image_url || auction.product.images[0]?.image || 'https://images.unsplash.com/photo-1586165368502-1bad197a6461?w=800'}
+                        alt={auction.product.name}
                         className="w-full h-full object-cover grayscale"
                       />
                     </div>
@@ -162,21 +162,21 @@ const AuctionPage: React.FC<AuctionPageProps> = ({ onAuctionClick }) => {
                   </div>
 
                   <CardContent className="p-5">
-                    <h3 className="text-gray-700 mb-2 line-clamp-1">{auction.productName}</h3>
+                    <h3 className="text-gray-700 mb-2 line-clamp-1">{auction.product.name}</h3>
                     
                     <div className="grid grid-cols-2 gap-3 my-4 p-3 bg-gray-50 rounded-lg">
                       <div>
                         <p className="text-xs text-gray-500">Final Bid</p>
-                        <p className="text-gray-700">Rs {auction.currentBid}</p>
+                        <p className="text-gray-700">Rs {parseFloat(auction.current_price).toLocaleString()}</p>
                       </div>
                       <div>
                         <p className="text-xs text-gray-500">Total Bids</p>
-                        <p className="text-gray-700">{auction.bids.length}</p>
+                        <p className="text-gray-700">{auction.total_bids}</p>
                       </div>
                     </div>
 
-                    {auction.winnerName && (
-                      <p className="text-sm text-gray-600">Winner: {auction.winnerName}</p>
+                    {auction.winner_username && (
+                      <p className="text-sm text-gray-600">Winner: {auction.winner_username}</p>
                     )}
                   </CardContent>
                 </Card>

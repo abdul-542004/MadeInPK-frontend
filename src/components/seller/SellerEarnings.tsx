@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { DollarSign, TrendingUp, CreditCard, Calendar } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
 import { Badge } from "../ui/badge";
@@ -10,15 +10,51 @@ import {
   SelectValue,
 } from "../ui/select";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from "recharts";
+import { sellerService } from "../../services/sellerService";
+import { MOCK_MODE } from "../../lib/mockMode";
+import { toast } from "sonner";
 
 export function SellerEarnings() {
   const [selectedPeriod, setSelectedPeriod] = useState("month");
-  
-  const earningsData = {
+  const [earningsData, setEarningsData] = useState({
     currentMonth: 45200,
     lastMonth: 38300,
     totalEarnings: 234500,
     pendingPayouts: 12500,
+  });
+  const [monthlyChartData, setMonthlyChartData] = useState<Array<{ month: string; amount: string }>>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    loadEarnings();
+  }, []);
+
+  const loadEarnings = async () => {
+    if (MOCK_MODE) {
+      // Use mock data
+      setLoading(false);
+      return;
+    }
+
+    // Backend mode
+    try {
+      setLoading(true);
+      const earnings = await sellerService.getSellerEarnings();
+      
+      setEarningsData({
+        currentMonth: parseFloat(earnings.completed_earnings || '0'),
+        lastMonth: 0, // Calculate from monthly data if needed
+        totalEarnings: parseFloat(earnings.total_earnings || '0'),
+        pendingPayouts: parseFloat(earnings.pending_earnings || '0'),
+      });
+
+      setMonthlyChartData(earnings.earnings_by_month || []);
+    } catch (error: any) {
+      console.error('Error loading earnings:', error);
+      toast.error(error.response?.data?.message || 'Failed to load earnings');
+    } finally {
+      setLoading(false);
+    }
   };
 
   // Chart data

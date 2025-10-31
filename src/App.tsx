@@ -153,15 +153,15 @@ function AppContent() {
           path="/checkout" 
           element={
             <CheckoutPage 
-              onSuccess={() => navigate("/order-success")}
-              onCancel={() => navigate("/cart")}
+              onOrderSuccess={() => navigate("/order-success")}
+              onBackToCart={() => navigate("/cart")}
             />
           } 
         />
         <Route path="/order-success" element={<OrderSuccessPage />} />
         <Route path="/about" element={<AboutUsPage />} />
         <Route path="/heritage" element={<HeritagePage />} />
-        <Route path="/admin-dashboard" element={<AdminDashboard />} />
+        <Route path="/admin-dashboard" element={<AdminDashboard onNavigate={handleNavigate} />} />
         <Route 
           path="/seller-dashboard" 
           element={<SellerDashboard onNavigate={handleNavigate} />} 
@@ -228,10 +228,10 @@ function AppContent() {
 export default function App() {
   return (
     <BrowserRouter>
-      <WishlistProvider>
-        <CartProvider>
-          <AddressProvider>
-            <AuthProvider>
+      <AuthProvider>
+        <WishlistProvider>
+          <CartProvider>
+            <AddressProvider>
               <NotificationProvider>
                 <ChatbotProvider>
                   <NotificationConnector>
@@ -243,10 +243,10 @@ export default function App() {
                   </NotificationConnector>
                 </ChatbotProvider>
               </NotificationProvider>
-            </AuthProvider>
-          </AddressProvider>
-        </CartProvider>
-      </WishlistProvider>
+            </AddressProvider>
+          </CartProvider>
+        </WishlistProvider>
+      </AuthProvider>
     </BrowserRouter>
   );
 }

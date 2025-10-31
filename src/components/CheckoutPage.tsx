@@ -5,7 +5,7 @@ import { useCart } from "../contexts/CartContext";
 import { useAddress } from "../contexts/AddressContext";
 import { AddressPanel } from "./AddressPanel";
 import { ImageWithFallback } from "./figma/ImageWithFallback";
-import { toast } from "sonner@2.0.3";
+import { toast } from "sonner";
 
 interface CheckoutPageProps {
   onBackToCart?: () => void;

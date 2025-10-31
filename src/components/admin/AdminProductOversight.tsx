@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Package, Search, CheckCircle, XCircle, Star as StarIcon, AlertCircle } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../ui/card";
 import { Input } from "../ui/input";
@@ -24,6 +24,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
 import { Textarea } from "../ui/textarea";
 import { toast } from "sonner";
 import { ImageWithFallback } from "../figma/ImageWithFallback";
+import { adminService } from "../../services/adminService";
+import { MOCK_MODE } from "../../lib/mockMode";
 
 interface Product {
   id: string;
@@ -42,6 +44,7 @@ export function AdminProductOversight() {
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [actionDialog, setActionDialog] = useState<"approve" | "reject" | "feature" | null>(null);
   const [rejectionReason, setRejectionReason] = useState("");
+  const [loading, setLoading] = useState(true);
 
   // Mock products data
   const [products, setProducts] = useState<Product[]>([
@@ -113,6 +116,42 @@ export function AdminProductOversight() {
     },
   ]);
 
+  useEffect(() => {
+    loadProducts();
+  }, []);
+
+  const loadProducts = async () => {
+    if (MOCK_MODE) {
+      // Use mock data already set
+      setLoading(false);
+      return;
+    }
+
+    // Backend mode
+    try {
+      setLoading(true);
+      const response = await adminService.getProducts();
+      // Map backend products to local Product format
+      const mappedProducts = response.results.map((p: any) => ({
+        id: p.id.toString(),
+        name: p.name,
+        seller: p.seller_username,
+        category: p.category_name,
+        price: `PKR ${parseFloat(p.price || '0').toLocaleString()}`,
+        status: p.approval_status || 'pending',
+        image: p.images[0]?.image_url || '',
+        submittedDate: new Date(p.created_at).toISOString().split('T')[0],
+        reports: 0, // Would need reports data
+      }));
+      setProducts(mappedProducts);
+    } catch (error: any) {
+      console.error('Error loading products:', error);
+      toast.error(error.response?.data?.message || 'Failed to load products');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const pendingProducts = products.filter((p) => p.status === "pending");
   const approvedProducts = products.filter((p) => p.status === "approved");
   const featuredProducts = products.filter((p) => p.status === "featured");
@@ -147,30 +186,60 @@ export function AdminProductOversight() {
     setActionDialog(action);
   };
 
-  const confirmAction = () => {
+  const confirmAction = async () => {
     if (!selectedProduct || !actionDialog) return;
 
-    let message = "";
-    switch (actionDialog) {
-      case "approve":
-        message = `${selectedProduct.name} approved! It's now live on MadeInPK.`;
-        break;
-      case "reject":
+    if (MOCK_MODE) {
+      // Mock mode
+      let message = "";
+      switch (actionDialog) {
+        case "approve":
+          message = `${selectedProduct.name} approved! It's now live on MadeInPK.`;
+          break;
+        case "reject":
+          if (!rejectionReason.trim()) {
+            toast.error("Please provide a rejection reason");
+            return;
+          }
+          message = `${selectedProduct.name} rejected. Seller will be notified.`;
+          break;
+        case "feature":
+          message = `${selectedProduct.name} featured! It will appear in "Editor's Choice".`;
+          break;
+      }
+
+      toast.success(message);
+      setActionDialog(null);
+      setSelectedProduct(null);
+      setRejectionReason("");
+      return;
+    }
+
+    // Backend mode
+    try {
+      if (actionDialog === "approve") {
+        await adminService.approveProduct(parseInt(selectedProduct.id));
+        toast.success(`${selectedProduct.name} approved! It's now live on MadeInPK.`);
+        await loadProducts(); // Reload products
+      } else if (actionDialog === "reject") {
         if (!rejectionReason.trim()) {
           toast.error("Please provide a rejection reason");
           return;
         }
-        message = `${selectedProduct.name} rejected. Seller will be notified.`;
-        break;
-      case "feature":
-        message = `${selectedProduct.name} featured! It will appear in "Editor's Choice".`;
-        break;
+        await adminService.rejectProduct(parseInt(selectedProduct.id), rejectionReason);
+        toast.success(`${selectedProduct.name} rejected. Seller will be notified.`);
+        await loadProducts();
+      } else if (actionDialog === "feature") {
+        toast.info('Feature product functionality coming soon');
+      }
+    } catch (error: any) {
+      console.error('Error performing action:', error);
+      toast.error(error.response?.data?.message || 'Failed to perform action');
+    } finally {
+      setActionDialog(null);
+      setSelectedProduct(null);
+      setRejectionReason("");
     }
-
-    toast.success(message);
-    setActionDialog(null);
-    setSelectedProduct(null);
-    setRejectionReason("");
   };
 
   const renderProductTable = (productList: Product[]) => (

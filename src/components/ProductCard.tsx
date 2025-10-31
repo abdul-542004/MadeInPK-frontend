@@ -37,10 +37,12 @@ export function ProductCard({ product, listing, onProductClick, onListingClick }
   
   const discountPercentage = 0; // Backend doesn't have originalPrice yet
 
-  const handleWishlistClick = (e: React.MouseEvent) => {
+  const handleWishlistClick = async (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (product) toggleWishlist(product);
-    else toast.info("Wishlist feature coming soon for backend products!");
+    const realProductId = listing ? listing.product.id : product?.id;
+    if (realProductId) {
+      await toggleWishlist(realProductId, displayProduct.name);
+    }
   };
 
   const handleAddToCart = (e: React.MouseEvent) => {

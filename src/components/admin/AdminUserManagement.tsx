@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Users, Search, Shield, Ban, CheckCircle, AlertCircle, UserCog } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../ui/card";
 import { Input } from "../ui/input";
@@ -22,6 +22,8 @@ import {
 } from "../ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select";
 import { toast } from "sonner";
+import { adminService } from "../../services/adminService";
+import { MOCK_MODE } from "../../lib/mockMode";
 
 interface User {
   id: string;
@@ -41,6 +43,7 @@ export function AdminUserManagement() {
   const [filterStatus, setFilterStatus] = useState("all");
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [actionDialog, setActionDialog] = useState<"promote" | "suspend" | "ban" | null>(null);
+  const [loading, setLoading] = useState(true);
 
   // Mock users data
   const [users, setUsers] = useState<User[]>([
@@ -112,6 +115,42 @@ export function AdminUserManagement() {
     },
   ]);
 
+  useEffect(() => {
+    loadUsers();
+  }, []);
+
+  const loadUsers = async () => {
+    if (MOCK_MODE) {
+      // Use mock data already set
+      setLoading(false);
+      return;
+    }
+
+    // Backend mode
+    try {
+      setLoading(true);
+      const response = await adminService.getUsers();
+      // Map backend users to local User format
+      const mappedUsers: User[] = response.results.map((u: any) => ({
+        id: u.id.toString(),
+        name: `${u.first_name} ${u.last_name}`.trim() || u.username,
+        email: u.email,
+        role: u.role as "buyer" | "seller" | "admin",
+        status: (u.is_blocked ? 'banned' : 'active') as "active" | "suspended" | "banned",
+        verified: u.seller_profile?.is_verified || false,
+        joinedDate: new Date(u.created_at).toISOString().split('T')[0],
+        totalOrders: u.total_purchases || 0,
+        totalSpent: `PKR ${(u.total_purchases || 0) * 5000}`, // Estimate
+      }));
+      setUsers(mappedUsers);
+    } catch (error: any) {
+      console.error('Error loading users:', error);
+      toast.error(error.response?.data?.message || 'Failed to load users');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const filteredUsers = users.filter((user) => {
     const matchesSearch =
       user.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -153,25 +192,50 @@ export function AdminUserManagement() {
     setActionDialog(action);
   };
 
-  const confirmAction = () => {
+  const confirmAction = async () => {
     if (!selectedUser || !actionDialog) return;
 
-    let message = "";
-    switch (actionDialog) {
-      case "promote":
-        message = `${selectedUser.name} promoted to seller successfully`;
-        break;
-      case "suspend":
-        message = `${selectedUser.name} suspended successfully`;
-        break;
-      case "ban":
-        message = `${selectedUser.name} banned successfully`;
-        break;
+    if (MOCK_MODE) {
+      // Mock mode - just show toast
+      let message = "";
+      switch (actionDialog) {
+        case "promote":
+          message = `${selectedUser.name} promoted to seller successfully`;
+          break;
+        case "suspend":
+          message = `${selectedUser.name} suspended successfully`;
+          break;
+        case "ban":
+          message = `${selectedUser.name} banned successfully`;
+          break;
+      }
+
+      toast.success(message);
+      setActionDialog(null);
+      setSelectedUser(null);
+      return;
     }
 
-    toast.success(message);
-    setActionDialog(null);
-    setSelectedUser(null);
+    // Backend mode
+    try {
+      if (actionDialog === "ban") {
+        await adminService.blockUser(parseInt(selectedUser.id));
+        toast.success(`${selectedUser.name} blocked successfully`);
+        await loadUsers(); // Reload users
+      } else if (actionDialog === "suspend") {
+        await adminService.unblockUser(parseInt(selectedUser.id));
+        toast.success(`${selectedUser.name} unblocked successfully`);
+        await loadUsers();
+      } else {
+        toast.info('Promotion feature coming soon');
+      }
+    } catch (error: any) {
+      console.error('Error performing action:', error);
+      toast.error(error.response?.data?.message || 'Failed to perform action');
+    } finally {
+      setActionDialog(null);
+      setSelectedUser(null);
+    }
   };
 
   return (

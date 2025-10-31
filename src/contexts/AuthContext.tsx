@@ -3,6 +3,7 @@ import { authService } from "../services/authService";
 import { User, UserRole, RegisterRequest } from "../types/auth";
 import { AxiosError } from "axios";
 import { toast } from "sonner";
+import { MOCK_MODE, mockDelay } from "../lib/mockMode";
 
 interface SellerInfo {
   businessName: string;
@@ -38,22 +39,37 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Initialize auth state from localStorage on mount
   useEffect(() => {
     const initAuth = async () => {
-      const token = localStorage.getItem('authToken');
-      const storedUser = localStorage.getItem('user');
-      
-      if (token && storedUser) {
-        try {
-          // Verify token is still valid by fetching profile
-          const userData = await authService.getProfile();
-          setUser(userData);
-        } catch (error) {
-          // Token is invalid, clear storage
-          localStorage.removeItem('authToken');
-          localStorage.removeItem('user');
+      try {
+        const token = localStorage.getItem('authToken');
+        const storedUser = localStorage.getItem('user');
+        
+        if (MOCK_MODE) {
+          // In mock mode, just use stored user if exists
+          if (storedUser) {
+            try {
+              setUser(JSON.parse(storedUser));
+            } catch (parseError) {
+              console.warn('Failed to parse user from localStorage');
+              localStorage.removeItem('user');
+              localStorage.removeItem('authToken');
+            }
+          }
+        } else if (token && storedUser) {
+          try {
+            // Verify token is still valid by fetching profile
+            const userData = await authService.getProfile();
+            setUser(userData);
+          } catch (error) {
+            // Token is invalid, clear storage
+            localStorage.removeItem('authToken');
+            localStorage.removeItem('user');
+          }
         }
+      } catch (error) {
+        console.error('Auth initialization error:', error);
+      } finally {
+        setLoading(false);
       }
-      
-      setLoading(false);
     };
     
     initAuth();
@@ -61,6 +77,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = async (email: string, password: string): Promise<{ success: boolean; error?: string }> => {
     try {
+      if (MOCK_MODE) {
+        // Mock login - accept any credentials
+        await mockDelay(500);
+        const mockUser: User = {
+          id: 1,
+          username: email.split('@')[0],
+          email: email,
+          first_name: 'Demo',
+          last_name: 'User',
+          phone_number: '0300-1234567',
+          profile_picture: null,
+          profile_picture_url: null,
+          role: 'both' as UserRole,
+          is_blocked: false,
+          failed_payment_count: 0,
+          created_at: new Date().toISOString(),
+        };
+        
+        localStorage.setItem('authToken', 'mock-token-' + Date.now());
+        localStorage.setItem('user', JSON.stringify(mockUser));
+        setUser(mockUser);
+        
+        return { success: true };
+      }
+      
       const response = await authService.login({ email, password });
       
       // Save token and user data

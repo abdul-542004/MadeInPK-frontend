@@ -8,7 +8,8 @@ import { Mail, Lock, User, Eye, EyeOff, Loader2, Phone } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 import { toast } from "sonner";
 import { UserRole } from "../types/auth";
-import logo from "figma:asset/5b5a9ccaf2f6b76406aeb93df9f19f90423b3a15.png";
+// @ts-ignore - PNG import
+import logo from "../assets/5b5a9ccaf2f6b76406aeb93df9f19f90423b3a15.png";
 
 interface AuthDialogProps {
   open: boolean;

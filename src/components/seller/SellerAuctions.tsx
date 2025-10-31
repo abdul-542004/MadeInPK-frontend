@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { useAuction } from '../../contexts/AuctionContext';
 import { Gavel, Clock, TrendingUp, Trash2, Upload, X } from 'lucide-react';
 import { Badge } from '../ui/badge';
-import { toast } from 'sonner@2.0.3';
+import { toast } from 'sonner';
 
 const SellerAuctions: React.FC = () => {
   const { myAuctions, createAuction, deleteAuction } = useAuction();

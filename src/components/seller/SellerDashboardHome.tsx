@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Package, ShoppingBag, DollarSign, TrendingUp, Eye, Edit, Bell, X } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
 import { Button } from "../ui/button";
@@ -19,6 +19,9 @@ import {
 import { useAuth } from "../../contexts/AuthContext";
 import { useSeller, SellerOrder } from "../../contexts/SellerContext";
 import { ScrollArea } from "../ui/scroll-area";
+import { sellerService } from "../../services/sellerService";
+import { MOCK_MODE } from "../../lib/mockMode";
+import { toast } from "sonner";
 
 interface SellerDashboardHomeProps {
   onAddProduct: () => void;
@@ -28,19 +31,66 @@ export function SellerDashboardHome({ onAddProduct }: SellerDashboardHomeProps) 
   const { user } = useAuth();
   const { products, orders, notifications, markNotificationAsRead, markAllNotificationsAsRead } = useSeller();
   const [viewingOrder, setViewingOrder] = useState<SellerOrder | null>(null);
+  const [statistics, setStatistics] = useState({
+    total_sales: 0,
+    total_orders: 0,
+    pending_orders: 0,
+    total_revenue: '0.00',
+    total_products: 0,
+    active_auctions: 0,
+  });
+  const [loading, setLoading] = useState(true);
 
-  // Calculate stats
-  const totalOrders = orders.length;
-  const pendingOrders = orders.filter(o => o.status === "Pending").length;
-  const currentMonth = new Date().getMonth();
-  const currentYear = new Date().getFullYear();
-  const earningsThisMonth = orders
-    .filter(o => {
-      const orderDate = new Date(o.date);
-      return orderDate.getMonth() === currentMonth && orderDate.getFullYear() === currentYear;
-    })
-    .reduce((sum, o) => sum + o.totalAmount, 0);
-  const productsListed = products.length;
+  // Load statistics from backend
+  useEffect(() => {
+    loadStatistics();
+  }, []);
+
+  const loadStatistics = async () => {
+    if (MOCK_MODE) {
+      // Use mock data from context
+      const totalOrders = orders.length;
+      const pendingOrders = orders.filter(o => o.status === "Pending").length;
+      const currentMonth = new Date().getMonth();
+      const currentYear = new Date().getFullYear();
+      const earningsThisMonth = orders
+        .filter(o => {
+          const orderDate = new Date(o.date);
+          return orderDate.getMonth() === currentMonth && orderDate.getFullYear() === currentYear;
+        })
+        .reduce((sum, o) => sum + o.totalAmount, 0);
+      const productsListed = products.length;
+
+      setStatistics({
+        total_sales: totalOrders,
+        total_orders: totalOrders,
+        pending_orders: pendingOrders,
+        total_revenue: earningsThisMonth.toString(),
+        total_products: productsListed,
+        active_auctions: 0,
+      });
+      setLoading(false);
+      return;
+    }
+
+    // Backend mode
+    try {
+      setLoading(true);
+      const stats = await sellerService.getSellerStatistics();
+      setStatistics(stats);
+    } catch (error: any) {
+      console.error('Error loading seller statistics:', error);
+      toast.error(error.response?.data?.message || 'Failed to load statistics');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Use backend statistics or fallback to context data
+  const totalOrders = statistics.total_orders;
+  const pendingOrders = statistics.pending_orders;
+  const earningsThisMonth = parseFloat(statistics.total_revenue);
+  const productsListed = statistics.total_products;
 
   const stats = [
     {
@@ -105,7 +155,7 @@ export function SellerDashboardHome({ onAddProduct }: SellerDashboardHomeProps) 
       {/* Header Section */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-gray-900 mb-1">Welcome back, {user?.name}! 👋</h1>
+          <h1 className="text-gray-900 mb-1">Welcome back, {user?.first_name || user?.username}! 👋</h1>
           <p className="text-gray-600">Here's what's happening with your store today.</p>
         </div>
         <div className="flex gap-2">

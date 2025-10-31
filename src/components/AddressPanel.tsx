@@ -5,7 +5,7 @@ import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { RadioGroup, RadioGroupItem } from "./ui/radio-group";
 import { useAddress } from "../contexts/AddressContext";
-import { toast } from "sonner@2.0.3";
+import { toast } from "sonner";
 
 interface AddressPanelProps {
   open: boolean;
@@ -13,56 +13,65 @@ interface AddressPanelProps {
 }
 
 export function AddressPanel({ open, onOpenChange }: AddressPanelProps) {
-  const { addAddress } = useAddress();
+  const { addAddress, provinces, cities, loadCities } = useAddress();
   const [formData, setFormData] = useState({
-    addressLine1: "",
-    city: "",
-    state: "",
-    pincode: "",
-    country: "Pakistan",
-    countryCode: "+92",
-    phoneNumber: "",
-    landmark: "",
-    addressType: "home" as "home" | "office",
+    full_name: "",
+    phone_number: "",
+    address_line1: "",
+    address_line2: "",
+    city: 0,
+    province: 0,
+    postal_code: "",
   });
 
-  const handleInputChange = (field: string, value: string) => {
+  const handleInputChange = (field: string, value: string | number) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
-  const handleSubmit = () => {
+  const handleProvinceChange = (provinceId: number) => {
+    setFormData((prev) => ({ ...prev, province: provinceId, city: 0 }));
+    loadCities(provinceId);
+  };
+
+  const handleSubmit = async () => {
     // Validate required fields
     if (
-      !formData.addressLine1 ||
+      !formData.full_name ||
+      !formData.phone_number ||
+      !formData.address_line1 ||
       !formData.city ||
-      !formData.state ||
-      !formData.pincode ||
-      !formData.phoneNumber
+      !formData.postal_code
     ) {
       toast.error("Please fill all required fields");
       return;
     }
 
-    addAddress({
-      ...formData,
-      isDefault: false,
-    });
+    try {
+      await addAddress({
+        full_name: formData.full_name,
+        phone_number: formData.phone_number,
+        address_line1: formData.address_line1,
+        address_line2: formData.address_line2,
+        city: formData.city,
+        postal_code: formData.postal_code,
+        is_default: false,
+      });
 
-    // Reset form
-    setFormData({
-      addressLine1: "",
-      city: "",
-      state: "",
-      pincode: "",
-      country: "Pakistan",
-      countryCode: "+92",
-      phoneNumber: "",
-      landmark: "",
-      addressType: "home",
-    });
+      // Reset form
+      setFormData({
+        full_name: "",
+        phone_number: "",
+        address_line1: "",
+        address_line2: "",
+        city: 0,
+        province: 0,
+        postal_code: "",
+      });
 
-    toast.success("Address added successfully");
-    onOpenChange(false);
+      onOpenChange(false);
+    } catch (error) {
+      // Error already handled by context
+    }
   };
 
   return (
@@ -75,119 +84,121 @@ export function AddressPanel({ open, onOpenChange }: AddressPanelProps) {
 
         <div className="flex-1 overflow-y-auto px-6 py-6">
           <div className="space-y-5">
-            {/* Address Line 1 */}
+            {/* Full Name */}
             <div className="space-y-2">
-              <Label htmlFor="addressLine1" className="text-sm text-gray-700">
-                Address Line 1
+              <Label htmlFor="full_name" className="text-sm text-gray-700">
+                Full Name *
               </Label>
               <Input
-                id="addressLine1"
-                value={formData.addressLine1}
-                onChange={(e) => handleInputChange("addressLine1", e.target.value)}
-                placeholder="Enter your address"
+                id="full_name"
+                value={formData.full_name}
+                onChange={(e) => handleInputChange("full_name", e.target.value)}
+                placeholder="Enter full name"
                 className="w-full"
               />
             </div>
 
-            {/* City */}
+            {/* Phone Number */}
             <div className="space-y-2">
-              <Label htmlFor="city" className="text-sm text-gray-700">
-                City
-              </Label>
-              <Input
-                id="city"
-                value={formData.city}
-                onChange={(e) => handleInputChange("city", e.target.value)}
-                placeholder="Enter city"
-                className="w-full"
-              />
-            </div>
-
-            {/* State */}
-            <div className="space-y-2">
-              <Label htmlFor="state" className="text-sm text-gray-700">
-                State
-              </Label>
-              <Input
-                id="state"
-                value={formData.state}
-                onChange={(e) => handleInputChange("state", e.target.value)}
-                placeholder="Enter state"
-                className="w-full"
-              />
-            </div>
-
-            {/* Pincode */}
-            <div className="space-y-2">
-              <Label htmlFor="pincode" className="text-sm text-gray-700">
-                Pincode
-              </Label>
-              <Input
-                id="pincode"
-                value={formData.pincode}
-                onChange={(e) => handleInputChange("pincode", e.target.value)}
-                placeholder="Enter pincode"
-                className="w-full"
-              />
-            </div>
-
-            {/* Country with Phone Code */}
-            <div className="space-y-2">
-              <Label htmlFor="country" className="text-sm text-gray-700">
-                Country
+              <Label htmlFor="phone_number" className="text-sm text-gray-700">
+                Phone Number *
               </Label>
               <div className="flex gap-3">
-                <div className="flex items-center gap-2 px-3 py-2 border rounded-md bg-gray-50 min-w-[120px]">
+                <div className="flex items-center gap-2 px-3 py-2 border rounded-md bg-gray-50 min-w-[80px]">
                   <span className="text-lg">🇵🇰</span>
-                  <span className="text-sm">{formData.countryCode}</span>
+                  <span className="text-sm">+92</span>
                 </div>
                 <Input
-                  id="phoneNumber"
-                  value={formData.phoneNumber}
-                  onChange={(e) => handleInputChange("phoneNumber", e.target.value)}
-                  placeholder="Phone number"
+                  id="phone_number"
+                  value={formData.phone_number}
+                  onChange={(e) => handleInputChange("phone_number", e.target.value)}
+                  placeholder="3001234567"
                   className="flex-1"
                 />
               </div>
             </div>
 
-            {/* Landmark */}
+            {/* Address Line 1 */}
             <div className="space-y-2">
-              <Label htmlFor="landmark" className="text-sm text-gray-700">
-                Landmark
+              <Label htmlFor="address_line1" className="text-sm text-gray-700">
+                Address Line 1 *
               </Label>
               <Input
-                id="landmark"
-                value={formData.landmark}
-                onChange={(e) => handleInputChange("landmark", e.target.value)}
-                placeholder="Enter landmark (optional)"
+                id="address_line1"
+                value={formData.address_line1}
+                onChange={(e) => handleInputChange("address_line1", e.target.value)}
+                placeholder="House # / Street / Area"
                 className="w-full"
               />
             </div>
 
-            {/* Address Type */}
+            {/* Address Line 2 */}
             <div className="space-y-2">
-              <Label className="text-sm text-gray-700">Address Type</Label>
-              <RadioGroup
-                value={formData.addressType}
-                onValueChange={(value) =>
-                  handleInputChange("addressType", value as "home" | "office")
-                }
-                className="flex gap-6"
+              <Label htmlFor="address_line2" className="text-sm text-gray-700">
+                Address Line 2 (Optional)
+              </Label>
+              <Input
+                id="address_line2"
+                value={formData.address_line2}
+                onChange={(e) => handleInputChange("address_line2", e.target.value)}
+                placeholder="Landmark or additional details"
+                className="w-full"
+              />
+            </div>
+
+            {/* Province */}
+            <div className="space-y-2">
+              <Label htmlFor="province" className="text-sm text-gray-700">
+                Province *
+              </Label>
+              <select
+                id="province"
+                value={formData.province}
+                onChange={(e) => handleProvinceChange(Number(e.target.value))}
+                className="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-emerald-500"
               >
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="home" id="home" />
-                  <Label htmlFor="home" className="cursor-pointer">
-                    Home
-                  </Label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="office" id="office" />
-                  <Label htmlFor="office" className="cursor-pointer">
-                    Office
-                  </Label>
-                </div>
-              </RadioGroup>
+                <option value={0}>Select Province</option>
+                {provinces.map((prov) => (
+                  <option key={prov.id} value={prov.id}>
+                    {prov.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* City */}
+            <div className="space-y-2">
+              <Label htmlFor="city" className="text-sm text-gray-700">
+                City *
+              </Label>
+              <select
+                id="city"
+                value={formData.city}
+                onChange={(e) => handleInputChange("city", Number(e.target.value))}
+                className="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-emerald-500"
+                disabled={!formData.province}
+              >
+                <option value={0}>Select City</option>
+                {cities.map((city) => (
+                  <option key={city.id} value={city.id}>
+                    {city.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Postal Code */}
+            <div className="space-y-2">
+              <Label htmlFor="postal_code" className="text-sm text-gray-700">
+                Postal Code *
+              </Label>
+              <Input
+                id="postal_code"
+                value={formData.postal_code}
+                onChange={(e) => handleInputChange("postal_code", e.target.value)}
+                placeholder="e.g., 54000"
+                className="w-full"
+              />
             </div>
           </div>
         </div>

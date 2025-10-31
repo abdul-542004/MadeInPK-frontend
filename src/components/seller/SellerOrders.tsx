@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Search, Package, Eye, Truck } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
 import { Input } from "../ui/input";
@@ -21,14 +21,46 @@ import {
   SelectValue,
 } from "../ui/select";
 import { useSeller, SellerOrder } from "../../contexts/SellerContext";
-import { toast } from "sonner@2.0.3";
+import { toast } from "sonner";
+import { sellerService } from "../../services/sellerService";
+import { MOCK_MODE } from "../../lib/mockMode";
 
 export function SellerOrders() {
-  const { orders, updateOrderStatus } = useSeller();
+  const { orders: contextOrders, updateOrderStatus } = useSeller();
+  const [orders, setOrders] = useState<SellerOrder[]>(contextOrders);
   const [searchQuery, setSearchQuery] = useState("");
   const [viewingOrder, setViewingOrder] = useState<SellerOrder | null>(null);
   const [updatingOrder, setUpdatingOrder] = useState<SellerOrder | null>(null);
   const [newStatus, setNewStatus] = useState<SellerOrder["status"]>("Pending");
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    loadOrders();
+  }, []);
+
+  const loadOrders = async () => {
+    if (MOCK_MODE) {
+      // Use mock data from context
+      setOrders(contextOrders);
+      setLoading(false);
+      return;
+    }
+
+    // Backend mode
+    try {
+      setLoading(true);
+      const response = await sellerService.getSellerOrders();
+      // Map backend orders to SellerOrder format if needed
+      setOrders(response.results || response);
+    } catch (error: any) {
+      console.error('Error loading orders:', error);
+      toast.error(error.response?.data?.message || 'Failed to load orders');
+      // Fallback to context orders
+      setOrders(contextOrders);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const filteredOrders = orders.filter((order) =>
     order.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
