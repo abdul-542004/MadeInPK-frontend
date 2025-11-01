@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, ReactNode, useEffect } from "react";
+import { createContext, useContext, useState, ReactNode, useEffect, useCallback } from "react";
 import { Product, mockProducts } from "../data/mockProducts";
 import { wishlistService, WishlistItem } from "../services/wishlistService";
 import { toast } from "sonner";
@@ -22,19 +22,7 @@ export function WishlistProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(false);
   const { isAuthenticated } = useAuth();
 
-  // Load wishlist on mount if authenticated
-  useEffect(() => {
-    if (MOCK_MODE) {
-      // In mock mode, load immediately
-      refreshWishlist();
-    } else if (isAuthenticated) {
-      refreshWishlist();
-    } else {
-      setWishlistItems([]);
-    }
-  }, [isAuthenticated]);
-
-  const refreshWishlist = async () => {
+  const refreshWishlist = useCallback(async () => {
     if (!isAuthenticated && !MOCK_MODE) return;
     
     try {
@@ -65,7 +53,18 @@ export function WishlistProvider({ children }: { children: ReactNode }) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [isAuthenticated]);
+
+  // Load wishlist on mount if authenticated
+  useEffect(() => {
+    if (MOCK_MODE) {
+      void refreshWishlist();
+    } else if (isAuthenticated) {
+      void refreshWishlist();
+    } else {
+      setWishlistItems([]);
+    }
+  }, [isAuthenticated, refreshWishlist]);
 
   const addToWishlist = async (productId: number, notes: string = '') => {
     if (!isAuthenticated && !MOCK_MODE) {
@@ -113,9 +112,9 @@ export function WishlistProvider({ children }: { children: ReactNode }) {
         localStorage.setItem('mockWishlist', JSON.stringify(updated));
         toast.success('Added to wishlist');
       } else {
-        const newItem = await wishlistService.addToWishlist(productId, notes);
-        setWishlistItems((prev) => [newItem, ...prev]);
+        await wishlistService.addToWishlist(productId, notes);
         toast.success('Added to wishlist');
+        await refreshWishlist();
       }
     } catch (error: any) {
       console.error('Failed to add to wishlist:', error);
@@ -143,8 +142,8 @@ export function WishlistProvider({ children }: { children: ReactNode }) {
         toast.success('Removed from wishlist');
       } else {
         await wishlistService.removeFromWishlist(item.id);
-        setWishlistItems((prev) => prev.filter((i) => i.id !== item.id));
         toast.success('Removed from wishlist');
+        await refreshWishlist();
       }
     } catch (error) {
       console.error('Failed to remove from wishlist:', error);

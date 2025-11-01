@@ -1,7 +1,9 @@
-import { ShoppingCart, Star, Heart } from "lucide-react";
+import { useEffect, useState } from "react";
+import { ShoppingCart, Star, Heart, MapPin } from "lucide-react";
 import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
 import { Product } from "../data/mockProducts";
+import type { Product as BackendProduct } from "../types/product";
 import { FixedPriceListing } from "../types/product";
 import { ImageWithFallback } from "./figma/ImageWithFallback";
 import { useWishlist } from "../contexts/WishlistContext";
@@ -16,32 +18,50 @@ interface ProductCardProps {
 }
 
 export function ProductCard({ product, listing, onProductClick, onListingClick }: ProductCardProps) {
-  const { toggleWishlist, isInWishlist } = useWishlist();
+  const { toggleWishlist, isInWishlist, loading: wishlistLoading } = useWishlist();
   const { addToCart } = useCart();
   
   // Support both old Product and new FixedPriceListing
   const isBackendListing = !!listing;
   const displayProduct = listing ? listing.product : product;
-  const price = listing ? parseFloat(listing.price) : product?.price || 0;
+  const backendCurrentPrice = listing ? parseFloat(listing.current_price || listing.price) : null;
+  const backendOriginalPrice = listing ? parseFloat(listing.original_price || listing.price) : null;
+  const backendDiscountPercentage = listing && listing.has_active_discount && listing.discount_percentage
+    ? parseFloat(listing.discount_percentage)
+    : null;
+  const mockDiscountPercentage = !isBackendListing && product?.originalPrice
+    ? Math.round(((product.originalPrice - (product?.price || 0)) / product.originalPrice) * 100)
+    : null;
+  const price = isBackendListing ? (backendCurrentPrice ?? 0) : product?.price || 0;
   const inStock = listing ? listing.quantity > 0 : product?.inStock || false;
-  const productId = listing ? listing.id : product?.id || 0;
+  const productId: number | null = isBackendListing ? listing.product.id : product?.id ?? null;
   
   if (!displayProduct) return null;
   
-  const isWishlisted = isInWishlist(productId);
-  
   // Type-safe access to backend product properties
-  const backendProduct = isBackendListing ? displayProduct as any : null;
+  const backendProduct = isBackendListing ? (displayProduct as BackendProduct & { is_in_wishlist?: boolean }) : null;
+  const backendIsWishlisted = isBackendListing ? Boolean(backendProduct?.is_in_wishlist) : false;
+  const contextWishlistStatus = productId !== null && !wishlistLoading ? isInWishlist(productId) : undefined;
+  const [optimisticWishlisted, setOptimisticWishlisted] = useState<boolean | null>(null);
+  const derivedWishlisted = optimisticWishlisted ?? (contextWishlistStatus !== undefined ? contextWishlistStatus : backendIsWishlisted);
+
+  useEffect(() => {
+    setOptimisticWishlisted(null);
+  }, [productId, backendIsWishlisted]);
   const primaryImage = backendProduct?.images?.find((img: any) => img.is_primary) || backendProduct?.images?.[0];
   const imageUrl = primaryImage ? primaryImage.image_url : (product?.image || '');
   
-  const discountPercentage = 0; // Backend doesn't have originalPrice yet
-
   const handleWishlistClick = async (e: React.MouseEvent) => {
     e.stopPropagation();
-    const realProductId = listing ? listing.product.id : product?.id;
-    if (realProductId) {
-      await toggleWishlist(realProductId, displayProduct.name);
+    if (productId === null) return;
+
+    const nextValue = !derivedWishlisted;
+    setOptimisticWishlisted(nextValue);
+    try {
+      await toggleWishlist(productId, displayProduct.name);
+    } catch (error) {
+      setOptimisticWishlisted(!nextValue);
+      throw error;
     }
   };
 
@@ -81,11 +101,16 @@ export function ProductCard({ product, listing, onProductClick, onListingClick }
           {!inStock && (
             <Badge variant="destructive">Out of Stock</Badge>
           )}
-          {discountPercentage > 0 && (
-            <Badge className="bg-emerald-700">{discountPercentage}% OFF</Badge>
+          {mockDiscountPercentage && (
+            <Badge className="bg-emerald-700">{mockDiscountPercentage}% OFF</Badge>
           )}
           {listing?.featured && (
             <Badge className="bg-yellow-500">Featured</Badge>
+          )}
+          {isBackendListing && backendDiscountPercentage && (
+            <Badge className="bg-red-500 text-white">
+              {Math.round(backendDiscountPercentage)}% OFF
+            </Badge>
           )}
         </div>
 
@@ -93,13 +118,13 @@ export function ProductCard({ product, listing, onProductClick, onListingClick }
         <button
           onClick={handleWishlistClick}
           className={`absolute top-3 right-3 bg-white rounded-full p-2 transition-all hover:bg-emerald-50 ${
-            isWishlisted ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+            derivedWishlisted ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
           }`}
-          aria-label={isWishlisted ? "Remove from wishlist" : "Add to wishlist"}
+          aria-label={derivedWishlisted ? "Remove from wishlist" : "Add to wishlist"}
         >
           <Heart 
             className={`h-4 w-4 transition-colors ${
-              isWishlisted 
+              derivedWishlisted 
                 ? 'fill-red-500 text-red-500' 
                 : 'text-gray-600 hover:text-emerald-700'
             }`} 
@@ -122,18 +147,16 @@ export function ProductCard({ product, listing, onProductClick, onListingClick }
 
       {/* Product Info */}
       <div className="p-4">
-        {/* Category and Seller */}
+        {/* Category and Region */}
         <div className="flex items-center justify-between mb-2">
           <span className="text-xs text-emerald-700">
             {isBackendListing ? backendProduct?.category_name : product?.category}
           </span>
-          {isBackendListing && (
-            <span className="text-xs text-gray-500">
-              {backendProduct?.seller_profile?.brand_name || backendProduct?.seller_username}
+          {(isBackendListing ? backendProduct?.region?.name : product?.region) && (
+            <span className="text-xs text-gray-500 flex items-center gap-1">
+              <MapPin className="w-3 h-3" />
+              {isBackendListing ? backendProduct?.region?.name : product?.region}
             </span>
-          )}
-          {!isBackendListing && product && (
-            <span className="text-xs text-gray-500">{product.region}</span>
           )}
         </div>
 
@@ -174,6 +197,11 @@ export function ProductCard({ product, listing, onProductClick, onListingClick }
           {!isBackendListing && product?.originalPrice && (
             <span className="text-sm text-gray-400 line-through">
               PKR {product.originalPrice.toLocaleString()}
+            </span>
+          )}
+          {isBackendListing && backendOriginalPrice && backendOriginalPrice > price && (
+            <span className="text-sm text-gray-400 line-through">
+              PKR {backendOriginalPrice.toLocaleString()}
             </span>
           )}
           {isBackendListing && listing && listing.quantity > 0 && (

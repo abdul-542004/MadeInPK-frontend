@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { BrowserRouter, Routes, Route, useNavigate, useLocation, Navigate } from "react-router-dom";
 import { WishlistProvider } from "./contexts/WishlistContext";
 import { CartProvider } from "./contexts/CartContext";
@@ -43,6 +43,10 @@ function AppContent() {
   const [isAddressPanelOpen, setIsAddressPanelOpen] = useState(false);
   const [isNotificationPanelOpen, setIsNotificationPanelOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState<string>("");
+
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }, [location.pathname]);
 
   const getCurrentPage = (): string => {
     const path = location.pathname;

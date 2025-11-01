@@ -8,7 +8,7 @@ import { Input } from './ui/input';
 import { Badge } from './ui/badge';
 import { Alert, AlertDescription } from './ui/alert';
 import { Progress } from './ui/progress';
-import { ArrowLeft, Gavel, Clock, TrendingUp, User, Trophy, AlertCircle } from 'lucide-react';
+import { ArrowLeft, Gavel, Clock, TrendingUp, User, Trophy, AlertCircle, MapPin } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   AlertDialog,
@@ -31,7 +31,9 @@ const AuctionDetailPage: React.FC<AuctionDetailPageProps> = ({ auctionId: propAu
   const { getAuction, placeBid } = useAuction();
   const { user } = useAuth();
   
-  const [auction, setAuction] = useState(getAuction(auctionId));
+  // Convert auctionId to number for lookup
+  const auctionIdNum = parseInt(auctionId, 10);
+  const [auction, setAuction] = useState(getAuction(auctionIdNum));
   const [bidAmount, setBidAmount] = useState('');
   const [selectedImage, setSelectedImage] = useState(0);
   const [showWinnerDialog, setShowWinnerDialog] = useState(false);
@@ -40,13 +42,13 @@ const AuctionDetailPage: React.FC<AuctionDetailPageProps> = ({ auctionId: propAu
   // Update auction data and countdown timer every second
   useEffect(() => {
     const interval = setInterval(() => {
-      const updatedAuction = getAuction(auctionId);
+      const updatedAuction = getAuction(auctionIdNum);
       
       // Check if auction just ended and user is the winner
       if (
         auction?.status === 'active' && 
         updatedAuction?.status === 'ended' &&
-        updatedAuction.winnerId === user?.email
+        updatedAuction.winner === user?.id
       ) {
         setShowWinnerDialog(true);
       }
@@ -55,7 +57,7 @@ const AuctionDetailPage: React.FC<AuctionDetailPageProps> = ({ auctionId: propAu
       setTick(prev => prev + 1);
     }, 1000);
     return () => clearInterval(interval);
-  }, [auctionId, auction?.status, user?.email, getAuction]);
+  }, [auctionIdNum, auction?.status, user?.email, getAuction]);
 
   if (!auction) {
     return (
@@ -80,7 +82,7 @@ const AuctionDetailPage: React.FC<AuctionDetailPageProps> = ({ auctionId: propAu
     
     if (remaining <= 0) return { text: 'Auction Ended', percent: 100 };
     
-    const totalDuration = endTime - auction.startTime;
+    const totalDuration = endTime - new Date(auction.start_time).getTime();
     const percent = ((totalDuration - remaining) / totalDuration) * 100;
     
     const days = Math.floor(remaining / (1000 * 60 * 60 * 24));
@@ -104,19 +106,21 @@ const AuctionDetailPage: React.FC<AuctionDetailPageProps> = ({ auctionId: propAu
       return;
     }
 
-    if (placeBid(auction.id, amount)) {
-      setBidAmount('');
-    }
+    placeBid(auction.id, amount).then(success => {
+      if (success) {
+        setBidAmount('');
+      }
+    });
   };
 
-  const timeRemaining = formatTimeRemaining(auction.endTime);
+  const timeRemaining = formatTimeRemaining(new Date(auction.end_time).getTime());
   const isActive = auction.status === 'active';
-  const isOwner = user?.email === auction.sellerId;
-  const hasUserBid = auction.bids.some(b => b.bidderId === user?.email);
+  const isOwner = user?.id === auction.product.seller;
+  const hasUserBid = auction.latest_bids.some(b => b.bidder === user?.id);
   const userHighestBid = hasUserBid 
-    ? Math.max(...auction.bids.filter(b => b.bidderId === user?.email).map(b => b.amount))
+    ? Math.max(...auction.latest_bids.filter(b => b.bidder === user?.id).map(b => parseFloat(b.amount)))
     : 0;
-  const isWinning = auction.currentBid === userHighestBid && hasUserBid;
+  const isWinning = parseFloat(auction.current_price) === userHighestBid && hasUserBid;
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-emerald-50 to-white">
@@ -137,16 +141,16 @@ const AuctionDetailPage: React.FC<AuctionDetailPageProps> = ({ auctionId: propAu
             <Card className="overflow-hidden">
               <div className="aspect-square bg-gray-100">
                 <img
-                  src={auction.images[selectedImage]}
-                  alt={auction.productName}
+                  src={auction.product.images[selectedImage]?.image_url || auction.product.images[selectedImage]?.image || 'https://images.unsplash.com/photo-1586165368502-1bad197a6461?w=800'}
+                  alt={auction.product.name}
                   className="w-full h-full object-cover"
                 />
               </div>
             </Card>
             
-            {auction.images.length > 1 && (
+            {auction.product.images.length > 1 && (
               <div className="grid grid-cols-4 gap-3">
-                {auction.images.map((img, idx) => (
+                {auction.product.images.map((img, idx) => (
                   <button
                     key={idx}
                     onClick={() => setSelectedImage(idx)}
@@ -154,7 +158,7 @@ const AuctionDetailPage: React.FC<AuctionDetailPageProps> = ({ auctionId: propAu
                       selectedImage === idx ? 'border-emerald-600 ring-2 ring-emerald-200' : 'border-gray-200 hover:border-emerald-300'
                     }`}
                   >
-                    <img src={img} alt={`View ${idx + 1}`} className="w-full h-full object-cover" />
+                    <img src={img.image_url || img.image} alt={`View ${idx + 1}`} className="w-full h-full object-cover" />
                   </button>
                 ))}
               </div>
@@ -178,11 +182,17 @@ const AuctionDetailPage: React.FC<AuctionDetailPageProps> = ({ auctionId: propAu
 
             {/* Product Info */}
             <div>
-              <h1 className="text-emerald-800 mb-2">{auction.productName}</h1>
-              <p className="text-gray-600 flex items-center gap-2">
+              <h1 className="text-emerald-800 mb-2">{auction.product.name}</h1>
+              <p className="text-gray-600 flex items-center gap-2 mb-1">
                 <User className="w-4 h-4" />
-                by {auction.sellerName}
+                by {auction.product.seller_username}
               </p>
+              {auction.product.region && (
+                <p className="text-sm text-gray-600 flex items-center gap-1">
+                  <MapPin className="w-3 h-3" />
+                  <span className="text-gray-900">{auction.product.region.name}</span>
+                </p>
+              )}
             </div>
 
             {/* Description */}
@@ -191,7 +201,7 @@ const AuctionDetailPage: React.FC<AuctionDetailPageProps> = ({ auctionId: propAu
                 <CardTitle className="text-emerald-800">Description</CardTitle>
               </CardHeader>
               <CardContent>
-                <p className="text-gray-600 whitespace-pre-line">{auction.description}</p>
+                <p className="text-gray-600 whitespace-pre-line">{auction.product.description}</p>
               </CardContent>
             </Card>
 
@@ -201,18 +211,18 @@ const AuctionDetailPage: React.FC<AuctionDetailPageProps> = ({ auctionId: propAu
                 <div className="grid grid-cols-2 gap-6">
                   <div>
                     <p className="text-sm text-gray-600 mb-1">Base Price</p>
-                    <p className="text-emerald-800 text-2xl">Rs {auction.basePrice}</p>
+                    <p className="text-emerald-800 text-2xl">Rs {parseFloat(auction.starting_price).toLocaleString()}</p>
                   </div>
                   <div>
                     <p className="text-sm text-gray-600 mb-1 flex items-center gap-1">
                       <TrendingUp className="w-4 h-4" />
                       Current Highest Bid
                     </p>
-                    <p className="text-emerald-800 text-2xl">Rs {auction.currentBid}</p>
+                    <p className="text-emerald-800 text-2xl">Rs {parseFloat(auction.current_price).toLocaleString()}</p>
                   </div>
                 </div>
                 <div className="mt-4 pt-4 border-t border-emerald-200">
-                  <p className="text-sm text-gray-600">Total Bids: {auction.bids.length}</p>
+                  <p className="text-sm text-gray-600">Total Bids: {auction.total_bids}</p>
                 </div>
               </CardContent>
             </Card>
@@ -267,10 +277,10 @@ const AuctionDetailPage: React.FC<AuctionDetailPageProps> = ({ auctionId: propAu
                       <div className="flex-1">
                         <Input
                           type="number"
-                          placeholder={`Enter amount (Min: Rs ${auction.currentBid + 1})`}
+                          placeholder={`Enter amount (Min: Rs ${parseFloat(auction.current_price) + 1})`}
                           value={bidAmount}
                           onChange={(e) => setBidAmount(e.target.value)}
-                          min={auction.currentBid + 1}
+                          min={parseFloat(auction.current_price) + 1}
                           className="text-lg h-12"
                           disabled={!user}
                         />
@@ -292,7 +302,7 @@ const AuctionDetailPage: React.FC<AuctionDetailPageProps> = ({ auctionId: propAu
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => setBidAmount(String(auction.currentBid + 100))}
+                          onClick={() => setBidAmount(String(parseFloat(auction.current_price) + 100))}
                           className="text-xs"
                         >
                           +Rs 100
@@ -300,7 +310,7 @@ const AuctionDetailPage: React.FC<AuctionDetailPageProps> = ({ auctionId: propAu
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => setBidAmount(String(auction.currentBid + 500))}
+                          onClick={() => setBidAmount(String(parseFloat(auction.current_price) + 500))}
                           className="text-xs"
                         >
                           +Rs 500
@@ -308,7 +318,7 @@ const AuctionDetailPage: React.FC<AuctionDetailPageProps> = ({ auctionId: propAu
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => setBidAmount(String(auction.currentBid + 1000))}
+                          onClick={() => setBidAmount(String(parseFloat(auction.current_price) + 1000))}
                           className="text-xs"
                         >
                           +Rs 1000
@@ -332,49 +342,49 @@ const AuctionDetailPage: React.FC<AuctionDetailPageProps> = ({ auctionId: propAu
                     This is your auction listing. You cannot bid on your own products.
                   </p>
                   <p className="text-sm text-gray-600 mt-2">
-                    Current status: {auction.bids.length} bid(s) • Highest: Rs {auction.currentBid}
+                    Current status: {auction.total_bids} bid(s) • Highest: Rs {parseFloat(auction.current_price).toLocaleString()}
                   </p>
                 </CardContent>
               </Card>
             )}
 
             {/* Ended Auction Winner */}
-            {!isActive && auction.winnerName && (
+            {!isActive && auction.winner_username && (
               <Card className="bg-gradient-to-br from-amber-50 to-white border-amber-300">
                 <CardContent className="pt-6">
                   <div className="flex items-center gap-3 mb-2">
                     <Trophy className="w-6 h-6 text-amber-600" />
                     <h3 className="text-amber-800">Auction Winner</h3>
                   </div>
-                  <p className="text-gray-700">{auction.winnerName}</p>
-                  <p className="text-amber-700">Winning Bid: Rs {auction.currentBid}</p>
+                  <p className="text-gray-700">{auction.winner_username}</p>
+                  <p className="text-amber-700">Winning Bid: Rs {parseFloat(auction.current_price).toLocaleString()}</p>
                 </CardContent>
               </Card>
             )}
 
             {/* Recent Bids */}
-            {auction.bids.length > 0 && (
+            {auction.latest_bids.length > 0 && (
               <Card>
                 <CardHeader>
                   <CardTitle className="text-emerald-800">Recent Bids</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-3 max-h-64 overflow-y-auto">
-                    {auction.bids.map((bid) => (
+                    {auction.latest_bids.map((bid) => (
                       <div 
                         key={bid.id} 
                         className={`flex justify-between items-center p-3 rounded-lg ${
-                          bid.bidderId === user?.email ? 'bg-emerald-50 border border-emerald-200' : 'bg-gray-50'
+                          bid.bidder === user?.id ? 'bg-emerald-50 border border-emerald-200' : 'bg-gray-50'
                         }`}
                       >
                         <div className="flex items-center gap-2">
                           <User className="w-4 h-4 text-gray-500" />
-                          <span className="text-gray-700">{bid.bidderName}</span>
-                          {bid.bidderId === user?.email && (
+                          <span className="text-gray-700">{bid.bidder_username}</span>
+                          {bid.bidder === user?.id && (
                             <Badge className="bg-emerald-600 text-xs">You</Badge>
                           )}
                         </div>
-                        <span className="text-emerald-700">Rs {bid.amount}</span>
+                        <span className="text-emerald-700">Rs {parseFloat(bid.amount).toLocaleString()}</span>
                       </div>
                     ))}
                   </div>
@@ -400,8 +410,8 @@ const AuctionDetailPage: React.FC<AuctionDetailPageProps> = ({ auctionId: propAu
             <AlertDialogDescription className="text-center space-y-2">
               <p className="text-lg">You've won the auction!</p>
               <div className="bg-emerald-50 p-4 rounded-lg my-4">
-                <p className="text-emerald-800 mb-1">{auction.productName}</p>
-                <p className="text-emerald-700">Winning Bid: Rs {auction.currentBid}</p>
+                <p className="text-emerald-800 mb-1">{auction.product.name}</p>
+                <p className="text-emerald-700">Winning Bid: Rs {parseFloat(auction.current_price).toLocaleString()}</p>
               </div>
               <p className="text-sm text-gray-600">
                 The seller will contact you shortly with payment and delivery details.

@@ -15,6 +15,11 @@ export interface SellerProfileSummary {
   average_rating: string;
 }
 
+export interface Region {
+  id: number;
+  name: string;
+}
+
 export type ProductCondition = 'new' | 'like_new' | 'good' | 'fair';
 export type ListingType = 'auction' | 'fixed_price';
 
@@ -32,6 +37,8 @@ export interface Product {
   average_rating: number | null;
   total_reviews: number;
   seller_profile: SellerProfileSummary | null;
+  region: Region | null;
+  is_in_wishlist?: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -67,9 +74,15 @@ export interface FixedPriceListing {
   id: number;
   product: Product;
   price: string;
+  original_price: string;
+  current_price: string;
   quantity: number;
   status: 'active' | 'inactive' | 'out_of_stock';
   featured: boolean;
+  discount_percentage: string | null;
+  discount_start_date: string | null;
+  discount_end_date: string | null;
+  has_active_discount: boolean;
   created_at: string;
   updated_at: string;
 }

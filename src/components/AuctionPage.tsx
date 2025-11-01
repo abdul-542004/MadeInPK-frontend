@@ -73,61 +73,65 @@ const AuctionPage: React.FC<AuctionPageProps> = ({ onAuctionClick }) => {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {activeAuctions.map((auction) => (
-                <Card 
-                  key={auction.id} 
-                  className="overflow-hidden hover:shadow-lg transition-all duration-300 cursor-pointer group border-2 hover:border-emerald-300"
-                  onClick={() => onAuctionClick?.(auction.id.toString())}
-                >
-                  <div className="relative">
-                    <div className="aspect-[4/3] overflow-hidden bg-gray-100">
-                      <img
-                        src={auction.product.images[0]?.image_url || auction.product.images[0]?.image || 'https://images.unsplash.com/photo-1586165368502-1bad197a6461?w=800'}
-                        alt={auction.product.name}
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                      />
-                    </div>
-                    <Badge className="absolute top-3 right-3 bg-emerald-600 shadow-lg">
-                      <Clock className="w-3 h-3 mr-1" />
-                      Live
-                    </Badge>
-                  </div>
+              {activeAuctions.map((auction) => {
+                const brandName = auction.product.seller_profile?.brand_name || auction.product.seller_username;
 
-                  <CardContent className="p-5">
-                    <h3 className="text-emerald-800 mb-2 line-clamp-1">{auction.product.name}</h3>
-                    <p className="text-sm text-gray-500 mb-1">by {auction.product.seller_username}</p>
-                    
-                    <div className="grid grid-cols-2 gap-3 my-4 p-3 bg-emerald-50 rounded-lg">
-                      <div>
-                        <p className="text-xs text-gray-500">Base Price</p>
-                        <p className="text-emerald-700">Rs {parseFloat(auction.starting_price).toLocaleString()}</p>
+                return (
+                  <Card 
+                    key={auction.id} 
+                    className="overflow-hidden hover:shadow-lg transition-all duration-300 cursor-pointer group border-2 hover:border-emerald-300"
+                    onClick={() => onAuctionClick?.(auction.id.toString())}
+                  >
+                    <div className="relative">
+                      <div className="aspect-[4/3] overflow-hidden bg-gray-100">
+                        <img
+                          src={auction.product.images[0]?.image_url || auction.product.images[0]?.image || 'https://images.unsplash.com/photo-1586165368502-1bad197a6461?w=800'}
+                          alt={auction.product.name}
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                        />
                       </div>
-                      <div>
-                        <p className="text-xs text-gray-500">Current Bid</p>
-                        <p className="text-emerald-700 flex items-center gap-1">
-                          <TrendingUp className="w-3 h-3" />
-                          Rs {parseFloat(auction.current_price).toLocaleString()}
-                        </p>
-                      </div>
+                      <Badge className="absolute top-3 right-3 bg-emerald-600 shadow-lg">
+                        <Clock className="w-3 h-3 mr-1" />
+                        Live
+                      </Badge>
                     </div>
 
-                    <div className="flex items-center justify-between mb-4">
-                      <div className="flex items-center gap-2">
-                        <Clock className={`w-4 h-4 ${getTimeColor(new Date(auction.end_time).getTime())}`} />
-                        <span className={`${getTimeColor(new Date(auction.end_time).getTime())}`}>
-                          {formatTimeRemaining(new Date(auction.end_time).getTime())} left
-                        </span>
+                    <CardContent className="p-5">
+                      <h3 className="text-emerald-800 mb-2 line-clamp-1">{auction.product.name}</h3>
+                      <p className="text-sm text-gray-500 mb-1">by {brandName}</p>
+                      
+                      <div className="grid grid-cols-2 gap-3 my-4 p-3 bg-emerald-50 rounded-lg">
+                        <div>
+                          <p className="text-xs text-gray-500">Base Price</p>
+                          <p className="text-emerald-700">Rs {parseFloat(auction.starting_price).toLocaleString()}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-gray-500">Current Bid</p>
+                          <p className="text-emerald-700 flex items-center gap-1">
+                            <TrendingUp className="w-3 h-3" />
+                            Rs {parseFloat(auction.current_price).toLocaleString()}
+                          </p>
+                        </div>
                       </div>
-                      <span className="text-sm text-gray-500">{auction.total_bids} bids</span>
-                    </div>
 
-                    <Button className="w-full bg-emerald-600 hover:bg-emerald-700 shadow-md">
-                      <Gavel className="w-4 h-4 mr-2" />
-                      Place Bid
-                    </Button>
-                  </CardContent>
-                </Card>
-              ))}
+                      <div className="flex items-center justify-between mb-4">
+                        <div className="flex items-center gap-2">
+                          <Clock className={`${getTimeColor(new Date(auction.end_time).getTime())}`} />
+                          <span className={`${getTimeColor(new Date(auction.end_time).getTime())}`}>
+                            {formatTimeRemaining(new Date(auction.end_time).getTime())} left
+                          </span>
+                        </div>
+                        <span className="text-sm text-gray-500">{auction.total_bids} bids</span>
+                      </div>
+
+                      <Button className="w-full bg-emerald-600 hover:bg-emerald-700 shadow-md">
+                        <Gavel className="w-4 h-4 mr-2" />
+                        Place Bid
+                      </Button>
+                    </CardContent>
+                  </Card>
+                );
+              })}
             </div>
           </div>
         )}

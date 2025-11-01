@@ -75,7 +75,11 @@ export function FeaturedProducts({ onNavigate }: FeaturedProductsProps) {
           {listings.map((listing) => {
             const product = listing.product;
             const primaryImage = product.images.find(img => img.is_primary) || product.images[0];
-            
+            const currentPrice = parseFloat(listing.current_price ?? listing.price);
+            const originalPrice = parseFloat(listing.original_price ?? listing.price);
+            const hasDiscount = listing.has_active_discount && listing.discount_percentage;
+            const discountPercent = hasDiscount ? Math.round(parseFloat(listing.discount_percentage!)) : null;
+
             return (
               <Card 
                 key={listing.id} 
@@ -96,8 +100,15 @@ export function FeaturedProducts({ onNavigate }: FeaturedProductsProps) {
                   >
                     <Heart className="h-5 w-5" />
                   </Button>
-                  <div className="absolute top-3 left-3 bg-emerald-700 text-white px-3 py-1 rounded-full text-sm">
-                    {product.category_name}
+                  <div className="absolute top-3 left-3 flex flex-col gap-2">
+                    <div className="bg-emerald-700 text-white px-3 py-1 rounded-full text-sm">
+                      {product.category_name}
+                    </div>
+                    {hasDiscount && (
+                      <div className="bg-red-500 text-white px-2 py-1 rounded text-xs">
+                        {discountPercent}% OFF
+                      </div>
+                    )}
                   </div>
                   {product.condition !== 'new' && (
                     <div className="absolute bottom-3 left-3 bg-blue-600 text-white px-2 py-1 rounded text-xs capitalize">
@@ -121,7 +132,12 @@ export function FeaturedProducts({ onNavigate }: FeaturedProductsProps) {
                   )}
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
-                      <span className="text-emerald-700 font-semibold text-lg">{formatPrice(listing.price)}</span>
+                      <div className="flex flex-col">
+                        <span className="text-emerald-700 font-semibold text-lg">{formatPrice(currentPrice.toString())}</span>
+                        {hasDiscount && originalPrice > currentPrice && (
+                          <span className="text-xs text-gray-500 line-through">{formatPrice(originalPrice.toString())}</span>
+                        )}
+                      </div>
                       {listing.quantity > 0 ? (
                         <span className="text-xs text-gray-500">{listing.quantity} in stock</span>
                       ) : (

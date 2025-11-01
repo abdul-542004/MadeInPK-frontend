@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
-import { Star, Heart, ArrowLeftRight, ShoppingCart, Minus, Plus, Truck, ArrowLeft, ChevronRight, Loader2 } from "lucide-react";
+import { Star, Heart, ArrowLeftRight, ShoppingCart, Minus, Plus, Truck, ArrowLeft, ChevronRight, Loader2, MapPin } from "lucide-react";
 import { Button } from "./ui/button";
 import { Separator } from "./ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
@@ -93,7 +93,12 @@ export function ProductDetailPage({ product: propProduct, listing: propListing, 
   // Support both backend listing and mock product
   const isBackendListing = !!listing;
   const displayProduct = listing ? listing.product : product;
-  const price = listing ? parseFloat(listing.price) : product?.price || 0;
+  const backendCurrentPrice = listing ? parseFloat(listing.current_price ?? listing.price) : null;
+  const backendOriginalPrice = listing ? parseFloat(listing.original_price ?? listing.price) : null;
+  const backendDiscountPercentage = listing && listing.has_active_discount && listing.discount_percentage
+    ? parseFloat(listing.discount_percentage)
+    : null;
+  const price = isBackendListing ? (backendCurrentPrice ?? 0) : product?.price || 0;
   const inStock = listing ? listing.quantity > 0 : product?.inStock || false;
   const stockCount = listing ? listing.quantity : (product?.inStock ? Math.floor(Math.random() * 50) + 10 : 0);
   
@@ -240,9 +245,10 @@ export function ProductDetailPage({ product: propProduct, listing: propListing, 
     ? (backendProduct?.images || [])
     : [product?.image, product?.image, product?.image, product?.image].filter(Boolean);
 
-  const discount = !isBackendListing && product?.originalPrice 
+  const mockDiscount = !isBackendListing && product?.originalPrice 
     ? Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100)
     : 0;
+  const activeDiscountPercentage = isBackendListing ? backendDiscountPercentage : (mockDiscount > 0 ? mockDiscount : null);
 
   // Get related products - same category, excluding current product
   const relatedProducts = mockProducts
@@ -353,10 +359,10 @@ export function ProductDetailPage({ product: propProduct, listing: propListing, 
                   alt={displayProduct.name}
                   className="w-full h-full object-cover"
                 />
-                {discount > 0 && (
+                {activeDiscountPercentage && (
                   <div className="absolute top-4 left-4">
                     <Badge className="bg-red-500 text-white hover:bg-red-600">
-                      {discount}% OFF
+                      {Math.round(activeDiscountPercentage)}% OFF
                     </Badge>
                   </div>
                 )}
@@ -377,7 +383,7 @@ export function ProductDetailPage({ product: propProduct, listing: propListing, 
                 <h1 className="text-emerald-700 mb-2">{displayProduct.name}</h1>
 
                 {/* Artisan/Brand */}
-                <div className="mb-4">
+                <div className="mb-2">
                   <p className="text-gray-600">
                     By <span className="text-emerald-700">
                       {isBackendListing 
@@ -387,6 +393,18 @@ export function ProductDetailPage({ product: propProduct, listing: propListing, 
                     </span>
                   </p>
                 </div>
+
+                {/* Region */}
+                {(isBackendListing ? backendProduct?.region : product?.region) && (
+                  <div className="mb-4">
+                    <p className="text-sm text-gray-600 flex items-center gap-1">
+                      <MapPin className="w-4 h-4" />
+                      <span className="text-gray-900">
+                        {isBackendListing ? backendProduct?.region?.name : product?.region}
+                      </span>
+                    </p>
+                  </div>
+                )}
 
                 {/* Rating & Reviews */}
                 <div className="flex items-center gap-2 mb-4">
@@ -420,10 +438,15 @@ export function ProductDetailPage({ product: propProduct, listing: propListing, 
                         PKR {product.originalPrice.toLocaleString()}
                       </span>
                     )}
-                    <span className="text-emerald-700">
-                      PKR {price.toLocaleString()}
-                    </span>
+                    {isBackendListing && backendOriginalPrice && backendOriginalPrice > price && (
+                      <span className="text-gray-400 line-through">
+                        PKR {backendOriginalPrice.toLocaleString()}
+                      </span>
+                    )}
                   </div>
+                  <span className="text-emerald-700">
+                    PKR {price.toLocaleString()}
+                  </span>
                 </div>
 
                 {/* Stock Availability */}
