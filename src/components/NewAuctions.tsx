@@ -9,9 +9,10 @@ import { toast } from "sonner";
 
 interface NewAuctionsProps {
   onNavigate?: (page: string) => void;
+  onAuctionSelect?: (auctionId: number | string) => void;
 }
 
-export function NewAuctions({ onNavigate }: NewAuctionsProps) {
+export function NewAuctions({ onNavigate, onAuctionSelect }: NewAuctionsProps) {
   const [auctions, setAuctions] = useState<Auction[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -83,7 +84,13 @@ export function NewAuctions({ onNavigate }: NewAuctionsProps) {
               <Card 
                 key={auction.id} 
                 className="group overflow-hidden border border-gray-200 hover:shadow-lg transition-shadow cursor-pointer"
-                onClick={() => onNavigate?.(`auction/${auction.id}`)}
+                onClick={() => {
+                  if (onAuctionSelect) {
+                    onAuctionSelect(auction.id);
+                  } else {
+                    onNavigate?.(`auction/${auction.id}`);
+                  }
+                }}
               >
                 <div className="relative overflow-hidden">
                   <ImageWithFallback
@@ -133,7 +140,11 @@ export function NewAuctions({ onNavigate }: NewAuctionsProps) {
                       className="bg-emerald-700 hover:bg-emerald-800"
                       onClick={(e: React.MouseEvent) => {
                         e.stopPropagation();
-                        onNavigate?.(`auction/${auction.id}`);
+                        if (onAuctionSelect) {
+                          onAuctionSelect(auction.id);
+                        } else {
+                          onNavigate?.(`auction/${auction.id}`);
+                        }
                       }}
                     >
                       <Gavel className="h-4 w-4 mr-2" />

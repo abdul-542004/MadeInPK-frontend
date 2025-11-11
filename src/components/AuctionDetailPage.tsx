@@ -185,7 +185,7 @@ const AuctionDetailPage: React.FC<AuctionDetailPageProps> = ({ auctionId: propAu
               <h1 className="text-emerald-800 mb-2">{auction.product.name}</h1>
               <p className="text-gray-600 flex items-center gap-2 mb-1">
                 <User className="w-4 h-4" />
-                by {auction.product.seller_username}
+                by {auction.product.seller_profile?.brand_name || auction.product.seller_username}
               </p>
               {auction.product.region && (
                 <p className="text-sm text-gray-600 flex items-center gap-1">

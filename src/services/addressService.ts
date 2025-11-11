@@ -54,8 +54,15 @@ export const addressService = {
    * GET /api/provinces/
    */
   getProvinces: async (): Promise<Province[]> => {
-    const response = await apiClient.get<Province[]>('/provinces/');
-    return response.data;
+    const response = await apiClient.get('/provinces/');
+    const data = response.data;
+    if (Array.isArray(data)) {
+      return data as Province[];
+    }
+    if (data?.results && Array.isArray(data.results)) {
+      return data.results as Province[];
+    }
+    return [];
   },
 
   /**

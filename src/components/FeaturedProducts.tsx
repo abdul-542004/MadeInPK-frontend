@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import type { MouseEvent } from "react";
 import { ImageWithFallback } from "./figma/ImageWithFallback";
 import { Card, CardContent } from "./ui/card";
 import { Button } from "./ui/button";
@@ -6,14 +7,17 @@ import { Heart, ShoppingCart, Star } from "lucide-react";
 import { productService } from "../services/productService";
 import { FixedPriceListing } from "../types/product";
 import { toast } from "sonner";
+import { useWishlist } from "../contexts/WishlistContext";
 
 interface FeaturedProductsProps {
   onNavigate?: (page: string) => void;
+  onListingSelect?: (listing: FixedPriceListing) => void;
 }
 
-export function FeaturedProducts({ onNavigate }: FeaturedProductsProps) {
+export function FeaturedProducts({ onNavigate, onListingSelect }: FeaturedProductsProps) {
   const [listings, setListings] = useState<FixedPriceListing[]>([]);
   const [loading, setLoading] = useState(true);
+  const { toggleWishlist, isInWishlist, loading: wishlistLoading } = useWishlist();
 
   useEffect(() => {
     loadProducts();
@@ -79,12 +83,27 @@ export function FeaturedProducts({ onNavigate }: FeaturedProductsProps) {
             const originalPrice = parseFloat(listing.original_price ?? listing.price);
             const hasDiscount = listing.has_active_discount && listing.discount_percentage;
             const discountPercent = hasDiscount ? Math.round(parseFloat(listing.discount_percentage!)) : null;
+            const productId = product.id;
+            const backendWishlisted = product.is_in_wishlist ?? false;
+            const isWishlisted = !wishlistLoading ? isInWishlist(productId) : backendWishlisted;
+
+            const handleWishlistClick = async (event: MouseEvent<HTMLButtonElement>) => {
+              event.stopPropagation();
+              if (!productId) return;
+
+              try {
+                await toggleWishlist(productId, product.name);
+              } catch (error) {
+                console.error("Failed to toggle wishlist:", error);
+                toast.error("Unable to update wishlist. Please try again.");
+              }
+            };
 
             return (
               <Card 
                 key={listing.id} 
                 className="group overflow-hidden border border-gray-200 hover:shadow-lg transition-shadow cursor-pointer"
-                onClick={() => onNavigate?.(`listing/${listing.id}`)}
+                onClick={() => onListingSelect?.(listing)}
               >
                 <div className="relative overflow-hidden">
                   <ImageWithFallback
@@ -96,9 +115,11 @@ export function FeaturedProducts({ onNavigate }: FeaturedProductsProps) {
                     size="icon"
                     variant="ghost"
                     className="absolute top-3 right-3 bg-white hover:bg-white hover:text-red-500"
-                    onClick={(e: React.MouseEvent) => e.stopPropagation()}
+                    onClick={handleWishlistClick}
+                    aria-pressed={isWishlisted}
+                    aria-label={isWishlisted ? "Remove from wishlist" : "Add to wishlist"}
                   >
-                    <Heart className="h-5 w-5" />
+                    <Heart className={`h-5 w-5 transition-colors ${isWishlisted ? "fill-red-500 text-red-500" : "text-gray-600"}`} />
                   </Button>
                   <div className="absolute top-3 left-3 flex flex-col gap-2">
                     <div className="bg-emerald-700 text-white px-3 py-1 rounded-full text-sm">

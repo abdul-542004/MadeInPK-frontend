@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { X, SlidersHorizontal } from "lucide-react";
 import { Button } from "./ui/button";
 import { Checkbox } from "./ui/checkbox";
@@ -6,13 +5,17 @@ import { RadioGroup, RadioGroupItem } from "./ui/radio-group";
 import { Label } from "./ui/label";
 import { Separator } from "./ui/separator";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "./ui/sheet";
-import { categories, regions, priceRanges } from "../data/mockProducts";
+import { priceRanges } from "../data/mockProducts";
+import type { Category } from "../types/product";
+import type { Province } from "../services/addressService";
 
 interface ProductFiltersProps {
-  selectedCategory: string;
-  onCategoryChange: (category: string) => void;
-  selectedRegion: string;
-  onRegionChange: (region: string) => void;
+  categories: Category[];
+  selectedCategoryId: number | null;
+  onCategoryChange: (categoryId: number | null) => void;
+  provinces: Province[];
+  selectedProvinceId: number | null;
+  onProvinceChange: (provinceId: number | null) => void;
   selectedPriceRange: number;
   onPriceRangeChange: (index: number) => void;
   inStockOnly: boolean;
@@ -23,10 +26,12 @@ interface ProductFiltersProps {
 }
 
 export function ProductFilters({
-  selectedCategory,
+  categories,
+  selectedCategoryId,
   onCategoryChange,
-  selectedRegion,
-  onRegionChange,
+  provinces,
+  selectedProvinceId,
+  onProvinceChange,
   selectedPriceRange,
   onPriceRangeChange,
   inStockOnly,
@@ -56,15 +61,30 @@ export function ProductFilters({
       {/* Category Filter */}
       <div className="space-y-3">
         <h4 className="text-emerald-700">Category</h4>
-        <RadioGroup value={selectedCategory} onValueChange={onCategoryChange}>
+        <RadioGroup
+          value={selectedCategoryId !== null ? selectedCategoryId.toString() : "all"}
+          onValueChange={(value) => {
+            if (value === "all") {
+              onCategoryChange(null);
+            } else {
+              onCategoryChange(Number(value));
+            }
+          }}
+        >
+          <div className="flex items-center space-x-2">
+            <RadioGroupItem value="all" id="category-all" />
+            <Label htmlFor="category-all" className="cursor-pointer text-gray-600 hover:text-emerald-700">
+              All Categories
+            </Label>
+          </div>
           {categories.map((category) => (
-            <div key={category} className="flex items-center space-x-2">
-              <RadioGroupItem value={category} id={`category-${category}`} />
+            <div key={category.id} className="flex items-center space-x-2">
+              <RadioGroupItem value={category.id.toString()} id={`category-${category.id}`} />
               <Label
-                htmlFor={`category-${category}`}
+                htmlFor={`category-${category.id}`}
                 className="cursor-pointer text-gray-600 hover:text-emerald-700"
               >
-                {category}
+                {category.name}
               </Label>
             </div>
           ))}
@@ -98,16 +118,31 @@ export function ProductFilters({
 
       {/* Region Filter */}
       <div className="space-y-3">
-        <h4 className="text-emerald-700">Region</h4>
-        <RadioGroup value={selectedRegion} onValueChange={onRegionChange}>
-          {regions.map((region) => (
-            <div key={region} className="flex items-center space-x-2">
-              <RadioGroupItem value={region} id={`region-${region}`} />
+        <h4 className="text-emerald-700">Province</h4>
+        <RadioGroup
+          value={selectedProvinceId !== null ? selectedProvinceId.toString() : "all"}
+          onValueChange={(value) => {
+            if (value === "all") {
+              onProvinceChange(null);
+            } else {
+              onProvinceChange(Number(value));
+            }
+          }}
+        >
+          <div className="flex items-center space-x-2">
+            <RadioGroupItem value="all" id="province-all" />
+            <Label htmlFor="province-all" className="cursor-pointer text-gray-600 hover:text-emerald-700">
+              All Provinces
+            </Label>
+          </div>
+          {provinces.map((province) => (
+            <div key={province.id} className="flex items-center space-x-2">
+              <RadioGroupItem value={province.id.toString()} id={`province-${province.id}`} />
               <Label
-                htmlFor={`region-${region}`}
+                htmlFor={`province-${province.id}`}
                 className="cursor-pointer text-gray-600 hover:text-emerald-700"
               >
-                {region}
+                {province.name}
               </Label>
             </div>
           ))}

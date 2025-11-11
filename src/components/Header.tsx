@@ -9,6 +9,7 @@ import { useCart } from "../contexts/CartContext";
 import { useAuth } from "../contexts/AuthContext";
 import { useNotifications } from "../contexts/NotificationContext";
 import { Product } from "../data/mockProducts";
+import type { FixedPriceListing } from "../types/product";
 import logo from "figma:asset/5b5a9ccaf2f6b76406aeb93df9f19f90423b3a15.png";
 
 type Page = "home" | "products" | "wishlist" | "cart" | "checkout" | "order-success" | "about" | "heritage" | "admin-dashboard" | "auctions";
@@ -18,6 +19,7 @@ interface HeaderProps {
   onNavigate: (page: Page) => void;
   onCartClick: () => void;
   onProductSelect?: (product: Product) => void;
+  onListingSelect?: (listing: FixedPriceListing) => void;
   onSearchSubmit?: (query: string) => void;
   onAccountClick?: () => void;
   onNotificationClick?: () => void;
@@ -28,6 +30,7 @@ export function Header({
   onNavigate, 
   onCartClick, 
   onProductSelect, 
+  onListingSelect,
   onSearchSubmit,
   onAccountClick,
   onNotificationClick
@@ -234,6 +237,7 @@ export function Header({
         open={searchDialogOpen} 
         onOpenChange={setSearchDialogOpen}
         onProductSelect={onProductSelect}
+        onListingSelect={onListingSelect}
         onNavigateToProducts={() => onNavigate("products")}
         onSearchSubmit={onSearchSubmit}
       />

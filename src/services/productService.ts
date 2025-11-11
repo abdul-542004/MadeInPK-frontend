@@ -6,7 +6,8 @@ import {
   FixedPriceListing,
   PaginatedResponse,
   ProductFilters,
-  AuctionFilters
+  AuctionFilters,
+  Category
 } from '../types/product';
 
 /**
@@ -15,6 +16,14 @@ import {
  */
 
 export const productService = {
+  /**
+   * Get product categories
+   */
+  getCategories: async (): Promise<Category[]> => {
+    const response = await apiClient.get<PaginatedResponse<Category>>('/categories/');
+    return response.data.results;
+  },
+
   /**
    * Get list of products with optional filters
    */
@@ -32,6 +41,14 @@ export const productService = {
     const response = await apiClient.get<PaginatedResponse<Product>>(
       `/products/?${params.toString()}`
     );
+    return response.data;
+  },
+
+  /**
+   * Get single fixed price listing by ID
+   */
+  getFixedPriceListing: async (id: number): Promise<FixedPriceListing> => {
+    const response = await apiClient.get<FixedPriceListing>(`/listings/${id}/`);
     return response.data;
   },
 

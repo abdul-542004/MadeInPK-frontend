@@ -11,6 +11,7 @@ import { NotificationConnector } from "./components/NotificationConnector";
 import { ChatbotProvider } from "./contexts/ChatbotContext";
 import { ChatBot } from "./components/ChatBot";
 import { Product } from "./data/mockProducts";
+import type { FixedPriceListing } from "./types/product";
 import { Toaster } from "./components/ui/sonner";
 import { HomePage } from "./components/HomePage";
 import { ProductsPage } from "./components/ProductsPage";
@@ -37,7 +38,9 @@ function AppContent() {
   const navigate = useNavigate();
   const location = useLocation();
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  const [selectedListing, setSelectedListing] = useState<FixedPriceListing | null>(null);
   const [selectedAuctionId, setSelectedAuctionId] = useState<string>("");
+  const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(null);
   const [isCartPanelOpen, setIsCartPanelOpen] = useState(false);
   const [isAccountPanelOpen, setIsAccountPanelOpen] = useState(false);
   const [isAddressPanelOpen, setIsAddressPanelOpen] = useState(false);
@@ -51,8 +54,9 @@ function AppContent() {
   const getCurrentPage = (): string => {
     const path = location.pathname;
     if (path === "/") return "home";
+    if (path.startsWith("/products/")) return "product-detail";
+    if (path === "/products") return "products";
     if (path.startsWith("/products")) return "products";
-    if (path.startsWith("/product/")) return "product-detail";
     if (path === "/wishlist") return "wishlist";
     if (path === "/cart") return "cart";
     if (path === "/checkout") return "checkout";
@@ -62,7 +66,7 @@ function AppContent() {
     if (path === "/admin-dashboard") return "admin-dashboard";
     if (path === "/seller-dashboard") return "seller-dashboard";
     if (path === "/auctions") return "auctions";
-    if (path.startsWith("/auction/")) return "auction-detail";
+    if (path.startsWith("/auctions/")) return "auction-detail";
     return "home";
   };
 
@@ -87,8 +91,21 @@ function AppContent() {
   };
 
   const handleProductSelect = (product: Product) => {
+    setSelectedListing(null);
     setSelectedProduct(product);
-    navigate(`/product/${product.id}`);
+    navigate(`/products/${product.id}`);
+  };
+
+  const handleListingSelect = (listing: FixedPriceListing | number) => {
+    setSelectedProduct(null);
+    if (typeof listing === "number") {
+      setSelectedListing(null);
+      navigate(`/products/${listing}`);
+      return;
+    }
+
+    setSelectedListing(listing);
+    navigate(`/products/${listing.id}`);
   };
 
   const handleSearchSubmit = (query: string) => {
@@ -96,9 +113,15 @@ function AppContent() {
     navigate("/products");
   };
 
-  const handleAuctionSelect = (auctionId: string) => {
+  const handleAuctionSelect = (auction: string | number) => {
+    const auctionId = auction.toString();
     setSelectedAuctionId(auctionId);
-    navigate(`/auction/${auctionId}`);
+    navigate(`/auctions/${auctionId}`);
+  };
+
+  const handleCategorySelect = (categoryId: number) => {
+    setSelectedCategoryId(categoryId);
+    navigate("/products");
   };
 
   return (
@@ -109,26 +132,40 @@ function AppContent() {
         onCartClick={() => setIsCartPanelOpen(true)}
         onProductSelect={handleProductSelect}
         onSearchSubmit={handleSearchSubmit}
+        onListingSelect={handleListingSelect}
         onAccountClick={() => setIsAccountPanelOpen(true)}
         onNotificationClick={() => setIsNotificationPanelOpen(true)}
       />
 
       <Routes>
-        <Route path="/" element={<HomePage onNavigate={handleNavigate} />} />
+        <Route 
+          path="/" 
+          element={
+            <HomePage 
+              onNavigate={handleNavigate} 
+              onListingSelect={handleListingSelect}
+              onAuctionSelect={(auctionId) => handleAuctionSelect(auctionId)}
+              onCategorySelect={handleCategorySelect}
+            />
+          } 
+        />
         <Route 
           path="/products" 
           element={
             <ProductsPage 
               searchQuery={searchQuery}
               onClearSearch={() => setSearchQuery("")}
+              categoryId={selectedCategoryId}
+              onCategoryChange={setSelectedCategoryId}
             />
           } 
         />
         <Route 
-          path="/product/:id" 
+          path="/products/:id" 
           element={
             <ProductDetailPage 
-              product={selectedProduct!}
+              product={selectedProduct ?? undefined}
+              listing={selectedListing ?? undefined}
               onBack={() => navigate("/products")}
               onProductClick={handleProductSelect}
               onNavigate={handleNavigate}
@@ -177,10 +214,10 @@ function AppContent() {
           } 
         />
         <Route 
-          path="/auction/:id" 
+          path="/auctions/:id" 
           element={
             <AuctionDetailPage 
-              auctionId=""
+              auctionId={selectedAuctionId}
               onBack={() => navigate("/auctions")}
             />
           } 

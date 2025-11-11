@@ -20,6 +20,14 @@ export interface Region {
   name: string;
 }
 
+export interface Category {
+  id: number;
+  name: string;
+  description?: string;
+  parent: number | null;
+  subcategories: Category[];
+}
+
 export type ProductCondition = 'new' | 'like_new' | 'good' | 'fair';
 export type ListingType = 'auction' | 'fixed_price';
 
@@ -102,6 +110,11 @@ export interface ProductFilters {
   ordering?: string;
   page?: number;
   page_size?: number;
+  province?: number;
+  region?: number;
+  min_price?: number;
+  max_price?: number;
+  featured?: boolean;
 }
 
 export interface AuctionFilters {

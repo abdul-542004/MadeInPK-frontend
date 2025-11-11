@@ -9,7 +9,9 @@ import { Pagination, PaginationContent, PaginationItem, PaginationLink, Paginati
 import { X, Loader2 } from "lucide-react";
 import { Button } from "./ui/button";
 import { productService } from "../services/productService";
-import { FixedPriceListing } from "../types/product";
+import { addressService } from "../services/addressService";
+import type { FixedPriceListing, Category } from "../types/product";
+import type { Province } from "../services/addressService";
 import { toast } from "sonner";
 import { priceRanges, sortOptions } from "../data/mockProducts";
 
@@ -37,17 +39,27 @@ const getCategoryId = (categoryName: string): number | null => {
 interface ProductsPageProps {
   searchQuery?: string;
   onClearSearch?: () => void;
+  categoryId?: number | null;
+  onCategoryChange?: (categoryId: number | null) => void;
 }
 
-export function ProductsPage({ searchQuery, onClearSearch }: ProductsPageProps = {}) {
+export function ProductsPage(props: ProductsPageProps = {}) {
+  const {
+    searchQuery,
+    onClearSearch,
+    categoryId = null,
+    onCategoryChange,
+  } = props;
   // Data states
   const [listings, setListings] = useState<FixedPriceListing[]>([]);
   const [loading, setLoading] = useState(true);
   const [totalCount, setTotalCount] = useState(0);
   
   // Filter states
-  const [selectedCategory, setSelectedCategory] = useState("All");
-  const [selectedRegion, setSelectedRegion] = useState("All Regions");
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [provinces, setProvinces] = useState<Province[]>([]);
+  const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(categoryId);
+  const [selectedProvinceId, setSelectedProvinceId] = useState<number | null>(null);
   const [selectedPriceRange, setSelectedPriceRange] = useState(0);
   const [inStockOnly, setInStockOnly] = useState(false);
   const [onSaleOnly, setOnSaleOnly] = useState(false);
@@ -55,10 +67,35 @@ export function ProductsPage({ searchQuery, onClearSearch }: ProductsPageProps =
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedListing, setSelectedListing] = useState<FixedPriceListing | null>(null);
 
+  // Load selectable filters from backend
+  useEffect(() => {
+    const loadFilterMetadata = async () => {
+      try {
+        const [categoryData, provinceData] = await Promise.all([
+          productService.getCategories(),
+          addressService.getProvinces(),
+        ]);
+        setCategories(categoryData);
+        setProvinces(provinceData);
+      } catch (error) {
+        console.error("Failed to load filter metadata:", error);
+        toast.error("Failed to load filters");
+      }
+    };
+
+    void loadFilterMetadata();
+  }, []);
+
+  // Sync external category changes (e.g., from homepage)
+  useEffect(() => {
+    setSelectedCategoryId(categoryId);
+    setCurrentPage(1);
+  }, [categoryId]);
+
   // Load listings from backend
   useEffect(() => {
     loadListings();
-  }, [searchQuery, selectedCategory, selectedPriceRange, inStockOnly, sortBy, currentPage]);
+  }, [searchQuery, selectedCategoryId, selectedProvinceId, selectedPriceRange, inStockOnly, onSaleOnly, sortBy, currentPage]);
 
   const loadListings = async () => {
     try {
@@ -76,12 +113,12 @@ export function ProductsPage({ searchQuery, onClearSearch }: ProductsPageProps =
         filters.search = searchQuery.trim();
       }
 
-      // Category filter
-      if (selectedCategory !== "All") {
-        const categoryId = getCategoryId(selectedCategory);
-        if (categoryId) {
-          filters.category = categoryId;
-        }
+      if (selectedCategoryId !== null) {
+        filters.category = selectedCategoryId;
+      }
+
+      if (selectedProvinceId !== null) {
+        filters.province = selectedProvinceId;
       }
 
       // Price range
@@ -93,8 +130,15 @@ export function ProductsPage({ searchQuery, onClearSearch }: ProductsPageProps =
         filters.max_price = priceRange.max;
       }
 
+      if (onSaleOnly) {
+        filters.has_active_discount = 'true';
+      }
+
       // Sorting
       switch (sortBy) {
+        case "featured":
+          filters.ordering = "-created_at";
+          break;
         case "price-asc":
           filters.ordering = "price";
           break;
@@ -109,8 +153,28 @@ export function ProductsPage({ searchQuery, onClearSearch }: ProductsPageProps =
       }
 
       const response = await productService.getFixedPriceListings(filters);
-      setListings(response.results);
-      setTotalCount(response.count);
+
+      let results = response.results;
+
+      if (inStockOnly) {
+        results = results.filter((listing) => listing.quantity > 0);
+      }
+
+      if (onSaleOnly) {
+        results = results.filter((listing) => listing.has_active_discount);
+      }
+
+      const orderedResults = sortBy === "featured"
+        ? [...results].sort((a, b) => {
+            if (a.featured === b.featured) {
+              return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+            }
+            return a.featured ? -1 : 1;
+          })
+        : results;
+
+      setListings(orderedResults);
+      setTotalCount(orderedResults.length);
     } catch (error) {
       console.error("Failed to load products:", error);
       toast.error("Failed to load products");
@@ -128,8 +192,9 @@ export function ProductsPage({ searchQuery, onClearSearch }: ProductsPageProps =
   };
 
   const clearFilters = () => {
-    setSelectedCategory("All");
-    setSelectedRegion("All Regions");
+    setSelectedCategoryId(null);
+    onCategoryChange?.(null);
+    setSelectedProvinceId(null);
     setSelectedPriceRange(0);
     setInStockOnly(false);
     setOnSaleOnly(false);
@@ -220,14 +285,17 @@ export function ProductsPage({ searchQuery, onClearSearch }: ProductsPageProps =
               <div className="flex items-center gap-4">
                 {/* Filter Button */}
                 <ProductFilters
-                  selectedCategory={selectedCategory}
+                  categories={categories}
+                  selectedCategoryId={selectedCategoryId}
                   onCategoryChange={(value) => {
-                    setSelectedCategory(value);
+                    setSelectedCategoryId(value);
+                    onCategoryChange?.(value);
                     handleFilterChange();
                   }}
-                  selectedRegion={selectedRegion}
-                  onRegionChange={(value) => {
-                    setSelectedRegion(value);
+                  provinces={provinces}
+                  selectedProvinceId={selectedProvinceId}
+                  onProvinceChange={(value) => {
+                    setSelectedProvinceId(value);
                     handleFilterChange();
                   }}
                   selectedPriceRange={selectedPriceRange}
