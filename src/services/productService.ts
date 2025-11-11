@@ -131,4 +131,65 @@ export const productService = {
     );
     return response.data;
   },
+
+  /**
+   * Delete a product
+   * DELETE /api/products/{id}/
+   */
+  deleteProduct: async (productId: number): Promise<void> => {
+    await apiClient.delete(`/products/${productId}/`);
+  },
+
+  /**
+   * Get auctions by seller
+   * GET /api/auctions/?seller={sellerId}
+   */
+  getSellerAuctions: async (sellerId: number): Promise<Auction[]> => {
+    const response = await apiClient.get<PaginatedResponse<Auction>>(
+      `/auctions/?seller=${sellerId}`
+    );
+    return response.data.results;
+  },
+
+  /**
+   * Create a new auction
+   * POST /api/auctions/
+   */
+  createAuction: async (auctionData: {
+    product_id: number;
+    starting_price: number;
+    start_time: string;
+    end_time: string;
+  }): Promise<Auction> => {
+    const response = await apiClient.post<Auction>('/auctions/', auctionData);
+    return response.data;
+  },
+
+  /**
+   * Create a new product
+   * POST /api/products/
+   */
+  createProduct: async (productData: {
+    name: string;
+    description: string;
+    category: number;
+    condition: string;
+    images?: { image: string; is_primary?: boolean; order?: number }[];
+  }): Promise<Product> => {
+    const response = await apiClient.post<Product>('/products/', productData);
+    return response.data;
+  },
+
+  /**
+   * Create a fixed-price listing
+   * POST /api/listings/
+   */
+  createFixedPriceListing: async (listingData: {
+    product_id: number;
+    price: number;
+    quantity: number;
+  }): Promise<FixedPriceListing> => {
+    const response = await apiClient.post<FixedPriceListing>('/listings/', listingData);
+    return response.data;
+  },
 };

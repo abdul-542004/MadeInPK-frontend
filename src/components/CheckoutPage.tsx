@@ -3,9 +3,12 @@ import { MapPin, Plus, ShoppingBag, CreditCard } from "lucide-react";
 import { Button } from "./ui/button";
 import { useCart } from "../contexts/CartContext";
 import { useAddress } from "../contexts/AddressContext";
+import { useAuth } from "../contexts/AuthContext";
 import { AddressPanel } from "./AddressPanel";
 import { ImageWithFallback } from "./figma/ImageWithFallback";
 import { toast } from "sonner";
+import { orderService } from "../services/orderService";
+import { MOCK_MODE } from "../lib/mockMode";
 
 interface CheckoutPageProps {
   onBackToCart?: () => void;
@@ -13,15 +16,17 @@ interface CheckoutPageProps {
 }
 
 export function CheckoutPage({ onBackToCart, onOrderSuccess }: CheckoutPageProps) {
-  const { cartItems, getCartTotal } = useCart();
+  const { cartItems, getCartTotal, clearCart } = useCart();
   const { addresses, getDefaultAddress } = useAddress();
+  const { user } = useAuth();
   const [isAddressPanelOpen, setIsAddressPanelOpen] = useState(false);
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<string | null>(null);
+  const [isProcessing, setIsProcessing] = useState(false);
 
   const subtotal = getCartTotal();
   const defaultAddress = getDefaultAddress();
 
-  const handleCheckout = () => {
+  const handleCheckout = async () => {
     if (!defaultAddress) {
       toast.error("Please add a delivery address");
       return;
@@ -30,9 +35,52 @@ export function CheckoutPage({ onBackToCart, onOrderSuccess }: CheckoutPageProps
       toast.error("Please select a payment method");
       return;
     }
-    // Navigate to order success page
-    if (onOrderSuccess) {
-      onOrderSuccess();
+    if (!user) {
+      toast.error("Please log in to place an order");
+      return;
+    }
+
+    if (MOCK_MODE) {
+      // Mock mode - just navigate to success page
+      if (onOrderSuccess) {
+        clearCart();
+        onOrderSuccess();
+      }
+      return;
+    }
+
+    // Backend mode - create actual order
+    setIsProcessing(true);
+    try {
+      const orderData = {
+        items: cartItems.map(item => ({
+          listing_id: item.listingId || item.product.id,
+          quantity: item.quantity
+        })),
+        shipping_address: {
+          full_name: defaultAddress.full_name,
+          phone_number: defaultAddress.phone_number,
+          address_line1: defaultAddress.address_line1,
+          address_line2: defaultAddress.address_line2,
+          city: defaultAddress.city.toString(),
+          province: defaultAddress.province.toString(),
+          postal_code: defaultAddress.postal_code
+        },
+        payment_method: selectedPaymentMethod
+      };
+
+      await orderService.createOrder(orderData);
+      clearCart();
+      toast.success("Order placed successfully!");
+      
+      if (onOrderSuccess) {
+        onOrderSuccess();
+      }
+    } catch (error: any) {
+      console.error('Error creating order:', error);
+      toast.error(error.response?.data?.message || 'Failed to place order');
+    } finally {
+      setIsProcessing(false);
     }
   };
 

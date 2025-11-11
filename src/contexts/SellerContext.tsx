@@ -1,4 +1,22 @@
-import { createContext, useContext, useState, ReactNode } from "react";
+import { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import { productService } from '../services/productService';
+import { MOCK_MODE } from '../lib/mockMode';
+import { toast } from 'sonner';
+
+// Helper function to map category names to IDs
+const getCategoryIdByName = (categoryName: string): number => {
+  const categoryMapping: Record<string, number> = {
+    "Textiles": 1,
+    "Handicrafts": 2,
+    "Pottery": 3,
+    "Jewelry": 4,
+    "Home Decor": 5,
+    "Carpets": 6,
+    "Leather Goods": 7,
+    "Woodwork": 8,
+  };
+  return categoryMapping[categoryName] || 1; // Default to Textiles
+};
 
 export interface SellerProduct {
   id: string;
@@ -68,7 +86,7 @@ interface SellerContextType {
   orders: SellerOrder[];
   conversations: Conversation[];
   notifications: SellerNotification[];
-  addProduct: (product: Omit<SellerProduct, "id" | "sales" | "createdAt" | "status" | "statusColor">) => void;
+  addProduct: (product: Omit<SellerProduct, "id" | "sales" | "createdAt" | "status" | "statusColor">) => Promise<void>;
   updateProduct: (id: string, updates: Partial<SellerProduct>) => void;
   deleteProduct: (id: string) => void;
   updateOrderStatus: (orderId: string, status: SellerOrder["status"]) => void;
@@ -365,26 +383,113 @@ export function SellerProvider({ children }: { children: ReactNode }) {
     },
   ]);
 
-  const addProduct = (productData: Omit<SellerProduct, "id" | "sales" | "createdAt" | "status" | "statusColor">) => {
-    const newId = String(products.length + 1);
-    const status = productData.stock > 10 ? "Active" : productData.stock > 0 ? "Low Stock" : "Out of Stock";
-    const statusColor =
-      status === "Active"
-        ? "bg-emerald-100 text-emerald-700"
-        : status === "Low Stock"
-        ? "bg-amber-100 text-amber-700"
-        : "bg-red-100 text-red-700";
+  // Load products from backend or use mock data
+  const loadProducts = async () => {
+    if (MOCK_MODE) {
+      // In mock mode, products are already set from initial state
+      return;
+    }
 
-    const newProduct: SellerProduct = {
-      ...productData,
-      id: newId,
-      sales: 0,
-      status,
-      statusColor,
-      createdAt: new Date().toISOString().split("T")[0],
-    };
+    try {
+      // In backend mode, fetch seller's listings
+      const response = await productService.getFixedPriceListings({ 
+        ordering: '-created_at', // Newest first
+        page_size: 50 
+      });
+      
+      // Convert backend data to SellerProduct format
+      const sellerProducts: SellerProduct[] = response.results.map(listing => ({
+        id: listing.id.toString(),
+        name: listing.product.name,
+        category: listing.product.category_name,
+        price: parseFloat(listing.price),
+        stock: listing.quantity,
+        sales: 0, // TODO: Get actual sales data
+        status: listing.quantity > 10 ? "Active" : listing.quantity > 0 ? "Low Stock" : "Out of Stock",
+        statusColor: listing.quantity > 10 
+          ? "bg-emerald-100 text-emerald-700"
+          : listing.quantity > 0 
+          ? "bg-amber-100 text-amber-700" 
+          : "bg-red-100 text-red-700",
+        createdAt: new Date(listing.created_at).toISOString().split("T")[0],
+        description: listing.product.description,
+        image: listing.product.images[0]?.image_url || '',
+        material: '', // TODO: Add material field to backend
+        origin: listing.product.region?.name || '',
+      }));
 
-    setProducts([...products, newProduct]);
+      setProducts(sellerProducts);
+    } catch (error) {
+      console.error('Error loading products:', error);
+      toast.error('Failed to load products');
+    }
+  };
+
+  // Load products on component mount in backend mode
+  useEffect(() => {
+    if (!MOCK_MODE) {
+      loadProducts();
+    }
+  }, []);
+
+  const addProduct = async (productData: Omit<SellerProduct, "id" | "sales" | "createdAt" | "status" | "statusColor">) => {
+    if (MOCK_MODE) {
+      // Mock mode implementation
+      const newId = String(products.length + 1);
+      const status = productData.stock > 10 ? "Active" : productData.stock > 0 ? "Low Stock" : "Out of Stock";
+      const statusColor =
+        status === "Active"
+          ? "bg-emerald-100 text-emerald-700"
+          : status === "Low Stock"
+          ? "bg-amber-100 text-amber-700"
+          : "bg-red-100 text-red-700";
+
+      const newProduct: SellerProduct = {
+        ...productData,
+        id: newId,
+        sales: 0,
+        status,
+        statusColor,
+        createdAt: new Date().toISOString().split("T")[0],
+      };
+
+      // Add to beginning of array to show newest first
+      setProducts([newProduct, ...products]);
+      toast.success('Product added successfully!');
+      return;
+    }
+
+    // Backend mode implementation
+    try {
+      // Map SellerProduct data to backend Product format
+      const backendProductData = {
+        name: productData.name,
+        description: productData.description || `${productData.name} - High quality product`,
+        category: getCategoryIdByName(productData.category),
+        condition: 'new' as const,
+        // Note: images would be handled separately
+      };
+
+      const createdProduct = await productService.createProduct(backendProductData);
+      
+      // Create a fixed-price listing for this product
+      const listingData = {
+        product_id: createdProduct.id,
+        price: productData.price,
+        quantity: productData.stock,
+      };
+
+      await productService.createFixedPriceListing(listingData);
+      
+      toast.success('Product created successfully!');
+      
+      // Refresh the products list
+      await loadProducts();
+      
+    } catch (error: any) {
+      console.error('Error creating product:', error);
+      toast.error(error.response?.data?.message || 'Failed to create product');
+    }
   };
 
   const updateProduct = (id: string, updates: Partial<SellerProduct>) => {

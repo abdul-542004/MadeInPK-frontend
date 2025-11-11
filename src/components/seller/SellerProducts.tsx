@@ -93,9 +93,22 @@ export function SellerProducts({ onAddProduct }: SellerProductsProps) {
   const [editStock, setEditStock] = useState("");
   const [editDescription, setEditDescription] = useState("");
 
-  const handleDelete = (id: string) => {
-    deleteProduct(id);
-    toast.success("Product deleted successfully!");
+  const handleDelete = async (id: string) => {
+    if (MOCK_MODE) {
+      deleteProduct(id);
+      toast.success("Product deleted successfully!");
+    } else {
+      // Backend mode - delete via API and refresh
+      try {
+        await productService.deleteProduct(Number(id));
+        toast.success("Product deleted successfully!");
+        // Refresh the products list
+        await loadProducts();
+      } catch (error: any) {
+        console.error('Error deleting product:', error);
+        toast.error(error.response?.data?.message || 'Failed to delete product');
+      }
+    }
     setDeletingProductId(null);
   };
 

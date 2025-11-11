@@ -15,6 +15,25 @@ import { priceRanges, sortOptions } from "../data/mockProducts";
 
 const PRODUCTS_PER_PAGE = 12;
 
+// Category name to ID mapping (based on backend categories)
+const categoryMapping: Record<string, number> = {
+  "Textiles": 1,
+  "Carpets": 2,
+  "Jewelry": 3,
+  "Metalwork": 4,
+  "Pottery": 5,
+  "Accessories": 6,
+  "Basketry": 7,
+  "Woodwork": 8,
+  "Stonework": 9,
+  "Art": 10,
+  "Footwear": 11
+};
+
+const getCategoryId = (categoryName: string): number | null => {
+  return categoryMapping[categoryName] || null;
+};
+
 interface ProductsPageProps {
   searchQuery?: string;
   onClearSearch?: () => void;
@@ -57,10 +76,13 @@ export function ProductsPage({ searchQuery, onClearSearch }: ProductsPageProps =
         filters.search = searchQuery.trim();
       }
 
-      // Category filter (would need category IDs from backend)
-      // if (selectedCategory !== "All") {
-      //   filters.category = getCategoryId(selectedCategory);
-      // }
+      // Category filter
+      if (selectedCategory !== "All") {
+        const categoryId = getCategoryId(selectedCategory);
+        if (categoryId) {
+          filters.category = categoryId;
+        }
+      }
 
       // Price range
       const priceRange = priceRanges[selectedPriceRange];

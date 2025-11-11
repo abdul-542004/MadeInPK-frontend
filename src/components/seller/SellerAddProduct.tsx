@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { toast } from "sonner";
 import { useSeller } from "../../contexts/SellerContext";
+import { MOCK_MODE } from "../../lib/mockMode";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Label } from "../ui/label";
@@ -45,7 +46,7 @@ export function SellerAddProduct({ onSuccess }: SellerAddProductProps) {
     setImages(images.filter((_, i) => i !== index));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!productName || !category || !price || !stock) {
@@ -53,20 +54,28 @@ export function SellerAddProduct({ onSuccess }: SellerAddProductProps) {
       return;
     }
 
-    addProduct({
-      name: productName,
-      category,
-      price: parseFloat(price),
-      stock: parseInt(stock),
-      description,
-      image: images[0] || "https://images.unsplash.com/photo-1578500494198-246f612d3b3d?w=300&h=300&fit=crop",
-      images,
-      material,
-      origin,
-    });
+    try {
+      await addProduct({
+        name: productName,
+        category,
+        price: parseFloat(price),
+        stock: parseInt(stock),
+        description,
+        image: images[0] || "https://images.unsplash.com/photo-1578500494198-246f612d3b3d?w=300&h=300&fit=crop",
+        images,
+        material,
+        origin,
+      });
 
-    toast.success("Product added successfully!");
-    onSuccess();
+      // Only show success toast and navigate if not in backend mode (backend mode shows its own toast)
+      if (MOCK_MODE) {
+        toast.success("Product added successfully!");
+      }
+      onSuccess();
+    } catch (error) {
+      // Error is already handled in the context
+      console.error('Error in handleSubmit:', error);
+    }
   };
 
   return (

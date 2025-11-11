@@ -11,6 +11,24 @@ import { Gavel, Clock, TrendingUp, Trash2, Upload, X } from 'lucide-react';
 import { Badge } from '../ui/badge';
 import { toast } from 'sonner';
 
+// Categories data (matching backend category IDs)
+const categories = [
+  { id: 1, name: "Textiles & Fabrics" },
+  { id: 2, name: "Carpets & Rugs" },
+  { id: 3, name: "Jewelry & Accessories" },
+  { id: 4, name: "Metalwork" },
+  { id: 5, name: "Pottery & Ceramics" },
+  { id: 6, name: "Home Decor" }
+];
+
+// Condition options (matching backend requirements)
+const conditions = [
+  { value: 'new', label: 'New' },
+  { value: 'like_new', label: 'Like New' },
+  { value: 'good', label: 'Good' },
+  { value: 'fair', label: 'Fair' }
+];
+
 const SellerAuctions: React.FC = () => {
   const { myAuctions, createAuction, deleteAuction } = useAuction();
   
@@ -19,6 +37,8 @@ const SellerAuctions: React.FC = () => {
     description: '',
     basePrice: '',
     duration: '24 hours',
+    category: '1', // Default category
+    condition: 'new', // Default condition
   });
   
   const [images, setImages] = useState<string[]>([]);
@@ -54,6 +74,8 @@ const SellerAuctions: React.FC = () => {
       images: images,
       basePrice: parseFloat(formData.basePrice),
       duration: formData.duration,
+      category: formData.category,
+      categoryId: parseInt(formData.category),
     });
 
     // Reset form
@@ -62,6 +84,8 @@ const SellerAuctions: React.FC = () => {
       description: '',
       basePrice: '',
       duration: '24 hours',
+      category: '1',
+      condition: 'new',
     });
     setImages([]);
   };
@@ -115,8 +139,8 @@ const SellerAuctions: React.FC = () => {
                       {/* Image */}
                       <div className="w-full md:w-48 h-48 bg-gray-100 flex-shrink-0">
                         <img
-                          src={auction.images[0]}
-                          alt={auction.productName}
+                          src={auction.product.images[0]?.image_url || auction.product.images[0]?.image}
+                          alt={auction.product.name}
                           className="w-full h-full object-cover"
                         />
                       </div>
@@ -125,12 +149,12 @@ const SellerAuctions: React.FC = () => {
                       <div className="flex-1 p-6">
                         <div className="flex justify-between items-start mb-4">
                           <div>
-                            <h3 className="text-emerald-800 mb-1">{auction.productName}</h3>
+                            <h3 className="text-emerald-800 mb-1">{auction.product.name}</h3>
                             <Badge variant={auction.status === 'active' ? 'default' : 'secondary'} className={auction.status === 'active' ? 'bg-emerald-600' : ''}>
                               {auction.status === 'active' ? 'Active' : 'Ended'}
                             </Badge>
                           </div>
-                          {auction.status === 'active' && auction.bids.length === 0 && (
+                          {auction.status === 'active' && auction.latest_bids.length === 0 && (
                             <Button
                               variant="ghost"
                               size="sm"
@@ -145,36 +169,36 @@ const SellerAuctions: React.FC = () => {
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                           <div>
                             <p className="text-sm text-gray-500">Base Price</p>
-                            <p className="text-emerald-700">Rs {auction.basePrice}</p>
+                            <p className="text-emerald-700">Rs {auction.starting_price}</p>
                           </div>
                           <div>
                             <p className="text-sm text-gray-500">Current Bid</p>
                             <p className="text-emerald-700">
-                              Rs {auction.currentBid}
+                              Rs {auction.current_price}
                             </p>
                           </div>
                           <div>
                             <p className="text-sm text-gray-500">Total Bids</p>
                             <p className="flex items-center gap-1">
                               <TrendingUp className="w-4 h-4 text-emerald-600" />
-                              {auction.bids.length}
+                              {auction.total_bids}
                             </p>
                           </div>
                           <div>
                             <p className="text-sm text-gray-500">Time Remaining</p>
                             <p className="flex items-center gap-1">
                               <Clock className="w-4 h-4 text-emerald-600" />
-                              {formatTimeRemaining(auction.endTime)}
+                              {formatTimeRemaining(new Date(auction.end_time).getTime())}
                             </p>
                           </div>
                         </div>
 
-                        {auction.status === 'ended' && auction.winnerName && (
+                        {auction.status === 'ended' && auction.winner_username && (
                           <div className="mt-4 p-3 bg-emerald-50 rounded-lg border border-emerald-200">
                             <p className="text-sm">
                               <span className="text-gray-600">Winner: </span>
-                              <span className="text-emerald-700">{auction.winnerName}</span>
-                              <span className="text-gray-600"> - Rs {auction.currentBid}</span>
+                              <span className="text-emerald-700">{auction.winner_username}</span>
+                              <span className="text-gray-600"> - Rs {auction.current_price}</span>
                             </p>
                           </div>
                         )}
@@ -218,6 +242,38 @@ const SellerAuctions: React.FC = () => {
                     rows={4}
                     required
                   />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="category">Category *</Label>
+                  <Select value={formData.category} onValueChange={(value) => setFormData({ ...formData, category: value })}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select a category" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {categories.map((category) => (
+                        <SelectItem key={category.id} value={category.id.toString()}>
+                          {category.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="condition">Condition *</Label>
+                  <Select value={formData.condition} onValueChange={(value) => setFormData({ ...formData, condition: value })}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select condition" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {conditions.map((condition) => (
+                        <SelectItem key={condition.value} value={condition.value}>
+                          {condition.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
 
                 <div className="space-y-2">

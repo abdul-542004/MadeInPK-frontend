@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode, useRef } from 'react';
 import { useAuth } from './AuthContext';
 import { toast } from 'sonner';
-import { Auction, Bid } from '../types/product';
+import { Auction, Bid, ProductCondition, ListingType, AuctionStatus } from '../types/product';
 import { productService } from '../services/productService';
 import { MOCK_MODE, mockDelay } from '../lib/mockMode';
 
@@ -60,6 +60,7 @@ const MOCK_AUCTIONS: Auction[] = [
       average_rating: null,
       total_reviews: 0,
       seller_profile: null,
+      region: { id: 1, name: 'Swat' },
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     },
@@ -106,6 +107,7 @@ const MOCK_AUCTIONS: Auction[] = [
       average_rating: null,
       total_reviews: 0,
       seller_profile: null,
+      region: { id: 2, name: 'Kashmir' },
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     },
@@ -338,11 +340,131 @@ export const AuctionProvider: React.FC<{ children: ReactNode }> = ({ children })
     return auctions.find(a => a.id === auctionId);
   };
 
-  // Backward compatibility stubs
+  // Create auction function
   const createAuction = async (auctionData: any): Promise<void> => {
-    toast.info('Please create auctions via the Products page', {
-      description: 'Go to Products > Add Product and select "Auction" as the listing type'
-    });
+    if (MOCK_MODE) {
+      // Mock mode implementation - create mock auction
+      const newId = Math.max(...auctions.map(a => a.id)) + 1;
+      const endTime = new Date();
+      endTime.setHours(endTime.getHours() + parseInt(auctionData.duration.split(' ')[0]));
+
+      const newAuction: Auction = {
+        id: newId,
+        product: {
+          id: newId,
+          name: auctionData.productName,
+          description: auctionData.description,
+          condition: 'new' as ProductCondition,
+          listing_type: 'auction' as ListingType,
+          images: auctionData.images?.map((img: string, index: number) => ({
+            id: index + 1,
+            image: img,
+            image_url: img,
+            is_primary: index === 0,
+            order: index
+          })) || [],
+          seller_username: user?.username || 'seller',
+          category_name: auctionData.category || 'Art',
+          seller: user?.id || 1,
+          category: auctionData.categoryId || 1,
+          average_rating: null,
+          total_reviews: 0,
+          seller_profile: null,
+          region: { id: 1, name: 'Unknown' },
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        },
+        starting_price: auctionData.basePrice.toString(),
+        current_price: auctionData.basePrice.toString(),
+        start_time: new Date().toISOString(),
+        end_time: endTime.toISOString(),
+        status: 'active' as AuctionStatus,
+        winner: null,
+        winner_username: null,
+        latest_bids: [],
+        total_bids: 0,
+        time_remaining: parseInt(auctionData.duration.split(' ')[0]) * 60 * 60, // Convert hours to seconds
+        created_at: new Date().toISOString(),
+      };
+
+      const updatedAuctions = [...auctions, newAuction];
+      setAuctions(updatedAuctions);
+      localStorage.setItem('mock_auctions', JSON.stringify(updatedAuctions));
+      toast.success('Auction created successfully!');
+      return;
+    }
+
+    // Backend mode - create product first, then auction
+    try {
+      setLoading(true);
+      console.log('User creating auction:', user);
+      console.log('Form data received:', auctionData);
+
+      // First, create the product
+      const productData = {
+        name: auctionData.productName,
+        description: auctionData.description,
+        category: auctionData.categoryId || 1, // Use selected category ID
+        condition: auctionData.condition || 'new' as ProductCondition,
+        // Note: images are handled separately via image upload endpoints
+      };
+
+      const newProduct = await productService.createProduct(productData);
+      console.log('Product created successfully:', newProduct);
+
+      // Calculate auction times
+      const startTime = new Date().toISOString();
+      const endTime = new Date(Date.now() + getDurationInMs(auctionData.duration)).toISOString();
+
+      console.log('Auction times:', { startTime, endTime, duration: auctionData.duration });
+
+      // Then, create the auction
+      const productId = newProduct?.id;
+      
+      if (!productId) {
+        console.error('Product response:', newProduct);
+        throw new Error('Product created but no ID returned');
+      }
+
+      const newAuctionData = {
+        product_id: productId,
+        starting_price: auctionData.basePrice,
+        start_time: startTime,
+        end_time: endTime
+      };
+
+      console.log('Creating auction with data:', newAuctionData);
+      await productService.createAuction(newAuctionData);
+
+      toast.success('Auction created successfully!');
+      
+      // Refresh auctions list
+      await loadAuctions();
+
+    } catch (error: any) {
+      console.error('Error creating auction:', error);
+      console.error('Error details:', error.response?.data);
+      console.error('Error status:', error.response?.status);
+      
+      const errorMessage = error.response?.data?.message || 
+                          error.response?.data?.detail || 
+                          JSON.stringify(error.response?.data) || 
+                          'Failed to create auction';
+      toast.error(errorMessage);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Helper function to convert duration string to milliseconds
+  const getDurationInMs = (duration: string): number => {
+    switch (duration) {
+      case '24 hours': return 24 * 60 * 60 * 1000;
+      case '48 hours': return 48 * 60 * 60 * 1000;
+      case '72 hours': return 72 * 60 * 60 * 1000;
+      case '1 week': return 7 * 24 * 60 * 60 * 1000;
+      default: return 24 * 60 * 60 * 1000;
+    }
   };
 
   const deleteAuction = async (auctionId: number): Promise<void> => {
@@ -352,8 +474,13 @@ export const AuctionProvider: React.FC<{ children: ReactNode }> = ({ children })
   };
 
   // Get auctions created by current user (seller)
+  // In backend mode, this should ideally be fetched separately with seller filter
+  // For now, filtering client-side but with correct seller ID field
   const myAuctions = user && isAuthenticated
-    ? auctions.filter(a => a.product.seller_username === user.username)
+    ? (MOCK_MODE 
+        ? auctions.filter(a => a.product.seller_username === user.username)
+        : auctions.filter(a => a.product.seller === user.id)
+      )
     : [];
 
   // Get auctions where current user has placed bids
