@@ -132,7 +132,7 @@ export function ProductCard({ product, listing, onProductClick, onListingClick }
             <Badge className="bg-emerald-700">{mockDiscountPercentage}% OFF</Badge>
           )}
           {listing?.featured && (
-            <Badge className="bg-yellow-500">Featured</Badge>
+            <Badge className="bg-emerald-700 text-white">Featured</Badge>
           )}
           {isBackendListing && backendDiscountPercentage && (
             <Badge className="bg-red-500 text-white">
@@ -189,7 +189,7 @@ export function ProductCard({ product, listing, onProductClick, onListingClick }
 
         {/* Product Name */}
         <h3 
-          className="text-gray-900 mb-1 line-clamp-2 min-h-[3rem] cursor-pointer hover:text-emerald-700 transition-colors"
+          className="text-gray-900 mb-1 line-clamp-2  cursor-pointer hover:text-emerald-700 transition-colors"
           onClick={handleCardClick}
         >
           {displayProduct.name}
@@ -198,6 +198,9 @@ export function ProductCard({ product, listing, onProductClick, onListingClick }
         {/* Seller/Artisan */}
         {!isBackendListing && product && (
           <p className="text-xs text-gray-600 mb-3">by {product.artisan}</p>
+        )}
+        {isBackendListing && backendProduct?.seller_profile?.brand_name && (
+          <p className="text-xs text-gray-600 mb-3">by {backendProduct.seller_profile.brand_name}</p>
         )}
 
         {/* Rating */}

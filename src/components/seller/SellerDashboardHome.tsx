@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Package, ShoppingBag, DollarSign, TrendingUp, Eye, Edit, Bell, X } from "lucide-react";
+import { Package, ShoppingBag, DollarSign, TrendingUp, Eye, Bell } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
 import { Button } from "../ui/button";
 import { Badge } from "../ui/badge";
@@ -17,76 +17,46 @@ import {
   PopoverTrigger,
 } from "../ui/popover";
 import { useAuth } from "../../contexts/AuthContext";
-import { useSeller, SellerOrder } from "../../contexts/SellerContext";
+import { useSeller } from "../../contexts/SellerContext";
 import { ScrollArea } from "../ui/scroll-area";
-import { sellerService } from "../../services/sellerService";
-import { MOCK_MODE } from "../../lib/mockMode";
-import { toast } from "sonner";
+import { SellerOrder, OrderStatus } from "../../types/seller";
 
 interface SellerDashboardHomeProps {
   onAddProduct: () => void;
 }
 
+// Helper function to get status color
+const getStatusColor = (status: OrderStatus): string => {
+  const statusColors: Record<OrderStatus, string> = {
+    pending_payment: "bg-amber-100 text-amber-700",
+    payment_failed: "bg-red-100 text-red-700",
+    paid: "bg-blue-100 text-blue-700",
+    shipped: "bg-purple-100 text-purple-700",
+    delivered: "bg-emerald-100 text-emerald-700",
+    cancelled: "bg-gray-100 text-gray-700",
+  };
+  return statusColors[status];
+};
+
+// Helper function to format date
+const formatDate = (dateString: string): string => {
+  const date = new Date(dateString);
+  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+};
+
 export function SellerDashboardHome({ onAddProduct }: SellerDashboardHomeProps) {
   const { user } = useAuth();
-  const { products, orders, notifications, markNotificationAsRead, markAllNotificationsAsRead } = useSeller();
+  const { products, orders, notifications, markNotificationAsRead, markAllNotificationsAsRead, statistics, loadStatistics } = useSeller();
   const [viewingOrder, setViewingOrder] = useState<SellerOrder | null>(null);
-  const [statistics, setStatistics] = useState({
-    total_sales: 0,
-    total_orders: 0,
-    pending_orders: 0,
-    total_revenue: '0.00',
-    total_products: 0,
-    active_auctions: 0,
-  });
   const [loading, setLoading] = useState(true);
 
   // Load statistics from backend
   useEffect(() => {
     loadStatistics();
+    setLoading(false);
   }, []);
 
-  const loadStatistics = async () => {
-    if (MOCK_MODE) {
-      // Use mock data from context
-      const totalOrders = orders.length;
-      const pendingOrders = orders.filter(o => o.status === "Pending").length;
-      const currentMonth = new Date().getMonth();
-      const currentYear = new Date().getFullYear();
-      const earningsThisMonth = orders
-        .filter(o => {
-          const orderDate = new Date(o.date);
-          return orderDate.getMonth() === currentMonth && orderDate.getFullYear() === currentYear;
-        })
-        .reduce((sum, o) => sum + o.totalAmount, 0);
-      const productsListed = products.length;
-
-      setStatistics({
-        total_sales: totalOrders,
-        total_orders: totalOrders,
-        pending_orders: pendingOrders,
-        total_revenue: earningsThisMonth.toString(),
-        total_products: productsListed,
-        active_auctions: 0,
-      });
-      setLoading(false);
-      return;
-    }
-
-    // Backend mode
-    try {
-      setLoading(true);
-      const stats = await sellerService.getSellerStatistics();
-      setStatistics(stats);
-    } catch (error: any) {
-      console.error('Error loading seller statistics:', error);
-      toast.error(error.response?.data?.message || 'Failed to load statistics');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Use backend statistics or fallback to context data
+  // Use backend statistics
   const totalOrders = statistics.total_orders;
   const pendingOrders = statistics.pending_orders;
   const earningsThisMonth = parseFloat(statistics.total_revenue);
@@ -128,7 +98,7 @@ export function SellerDashboardHome({ onAddProduct }: SellerDashboardHomeProps) 
   ];
 
   const recentOrders = orders
-    .filter(o => !["Delivered", "Cancelled"].includes(o.status))
+    .filter(o => !["delivered", "cancelled"].includes(o.status))
     .slice(0, 4);
 
   const recentProducts = products.slice(0, 4);
@@ -279,16 +249,16 @@ export function SellerDashboardHome({ onAddProduct }: SellerDashboardHomeProps) 
                 {recentOrders.map((order) => (
                   <tr key={order.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="text-sm text-gray-900">{order.id}</span>
+                      <span className="text-sm text-gray-900">{order.order_number}</span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="text-sm text-gray-700">{order.productName}</span>
+                      <span className="text-sm text-gray-700">{order.product_name}</span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="text-sm text-gray-600">{order.date}</span>
+                      <span className="text-sm text-gray-600">{formatDate(order.created_at)}</span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <Badge className={`${order.statusColor}`}>{order.status}</Badge>
+                      <Badge className={getStatusColor(order.status)}>{order.status.replace('_', ' ')}</Badge>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex gap-2">
@@ -329,14 +299,14 @@ export function SellerDashboardHome({ onAddProduct }: SellerDashboardHomeProps) 
                 className="border border-gray-200 rounded-lg overflow-hidden hover:shadow-md transition-shadow cursor-pointer"
               >
                 <img
-                  src={product.image}
+                  src={product.images[0]?.image_url || "https://via.placeholder.com/300"}
                   alt={product.name}
                   className="w-full h-40 object-cover"
                 />
                 <div className="p-3">
                   <h4 className="text-sm text-gray-900 mb-1 line-clamp-1">{product.name}</h4>
-                  <p className="text-sm text-emerald-700">PKR {product.price.toLocaleString()}</p>
-                  <p className="text-xs text-gray-500 mt-1">{product.sales} sales</p>
+                  <p className="text-sm text-emerald-700">PKR {product.price ? parseFloat(product.price).toLocaleString() : 'N/A'}</p>
+                  <p className="text-xs text-gray-500 mt-1">Stock: {product.quantity || 0}</p>
                 </div>
               </div>
             ))}
@@ -350,7 +320,7 @@ export function SellerDashboardHome({ onAddProduct }: SellerDashboardHomeProps) 
           <DialogHeader>
             <DialogTitle>Order Details</DialogTitle>
             <DialogDescription>
-              {viewingOrder?.id}
+              {viewingOrder?.order_number}
             </DialogDescription>
           </DialogHeader>
           {viewingOrder && (
@@ -358,15 +328,11 @@ export function SellerDashboardHome({ onAddProduct }: SellerDashboardHomeProps) 
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <p className="text-sm text-gray-600">Customer Name</p>
-                  <p className="text-gray-900">{viewingOrder.customer}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-gray-600">Customer Email</p>
-                  <p className="text-gray-900">{viewingOrder.customerEmail}</p>
+                  <p className="text-gray-900">{viewingOrder.buyer_username}</p>
                 </div>
                 <div>
                   <p className="text-sm text-gray-600">Product</p>
-                  <p className="text-gray-900">{viewingOrder.productName}</p>
+                  <p className="text-gray-900">{viewingOrder.product_name}</p>
                 </div>
                 <div>
                   <p className="text-sm text-gray-600">Quantity</p>
@@ -374,24 +340,26 @@ export function SellerDashboardHome({ onAddProduct }: SellerDashboardHomeProps) 
                 </div>
                 <div>
                   <p className="text-sm text-gray-600">Total Amount</p>
-                  <p className="text-gray-900">{viewingOrder.total}</p>
+                  <p className="text-gray-900">PKR {parseFloat(viewingOrder.total_amount).toLocaleString()}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-600">Your Earnings</p>
+                  <p className="text-gray-900">PKR {parseFloat(viewingOrder.seller_amount).toLocaleString()}</p>
                 </div>
                 <div>
                   <p className="text-sm text-gray-600">Order Date</p>
-                  <p className="text-gray-900">{viewingOrder.date}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-gray-600">Payment Method</p>
-                  <p className="text-gray-900">{viewingOrder.paymentMethod}</p>
+                  <p className="text-gray-900">{formatDate(viewingOrder.created_at)}</p>
                 </div>
                 <div>
                   <p className="text-sm text-gray-600">Status</p>
-                  <Badge className={viewingOrder.statusColor}>{viewingOrder.status}</Badge>
+                  <Badge className={getStatusColor(viewingOrder.status)}>{viewingOrder.status.replace('_', ' ')}</Badge>
                 </div>
               </div>
               <div>
                 <p className="text-sm text-gray-600 mb-1">Shipping Address</p>
-                <p className="text-gray-900">{viewingOrder.shippingAddress}</p>
+                <p className="text-gray-900">
+                  {viewingOrder.shipping_address_detail.street_address}, {viewingOrder.shipping_address_detail.city_name}, {viewingOrder.shipping_address_detail.province_name} {viewingOrder.shipping_address_detail.postal_code}
+                </p>
               </div>
             </div>
           )}

@@ -41,6 +41,7 @@ interface ProductsPageProps {
   onClearSearch?: () => void;
   categoryId?: number | null;
   onCategoryChange?: (categoryId: number | null) => void;
+  onListingClick?: (listing: FixedPriceListing) => void;
 }
 
 export function ProductsPage(props: ProductsPageProps = {}) {
@@ -49,6 +50,7 @@ export function ProductsPage(props: ProductsPageProps = {}) {
     onClearSearch,
     categoryId = null,
     onCategoryChange,
+    onListingClick,
   } = props;
   // Data states
   const [listings, setListings] = useState<FixedPriceListing[]>([]);
@@ -65,7 +67,6 @@ export function ProductsPage(props: ProductsPageProps = {}) {
   const [onSaleOnly, setOnSaleOnly] = useState(false);
   const [sortBy, setSortBy] = useState("featured");
   const [currentPage, setCurrentPage] = useState(1);
-  const [selectedListing, setSelectedListing] = useState<FixedPriceListing | null>(null);
 
   // Load selectable filters from backend
   useEffect(() => {
@@ -200,16 +201,6 @@ export function ProductsPage(props: ProductsPageProps = {}) {
     setOnSaleOnly(false);
     setCurrentPage(1);
   };
-
-  // If a listing is selected, show the detail page
-  if (selectedListing) {
-    return (
-      <ProductDetailPage 
-        listing={selectedListing} 
-        onBack={() => setSelectedListing(null)}
-      />
-    );
-  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -351,7 +342,7 @@ export function ProductsPage(props: ProductsPageProps = {}) {
                     <ProductCard 
                       key={listing.id} 
                       listing={listing}
-                      onListingClick={setSelectedListing}
+                      onListingClick={onListingClick}
                     />
                   ))}
                 </div>

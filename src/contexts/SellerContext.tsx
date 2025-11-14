@@ -1,8 +1,16 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import { productService } from '../services/productService';
-import { messagingService, Conversation as ApiConversation, Message } from '../services/messagingService';
+import { sellerService } from '../services/sellerService';
 import { MOCK_MODE } from '../lib/mockMode';
 import { toast } from 'sonner';
+import { 
+  SellerOrder, 
+  SellerProductListing, 
+  SellerStatistics,
+  OrderStatus 
+} from '../types/seller';
+import { Product, FixedPriceListing } from '../types/product';
+import { useAuth } from './AuthContext';
 
 // Helper function to map category names to IDs
 const getCategoryIdByName = (categoryName: string): number => {
@@ -16,47 +24,10 @@ const getCategoryIdByName = (categoryName: string): number => {
     "Leather Goods": 7,
     "Woodwork": 8,
   };
-  return categoryMapping[categoryName] || 1; // Default to Textiles
+  return categoryMapping[categoryName] || 1;
 };
 
-export interface SellerProduct {
-  id: string;
-  name: string;
-  category: string;
-  price: number;
-  stock: number;
-  status: "Active" | "Out of Stock" | "Low Stock" | "Inactive";
-  statusColor: string;
-  image: string;
-  sales: number;
-  description?: string;
-  material?: string;
-  origin?: string;
-  dimensions?: {
-    length?: number;
-    width?: number;
-    weight?: number;
-  };
-  images?: string[];
-  createdAt: string;
-}
-
-export interface SellerOrder {
-  id: string;
-  customer: string;
-  customerEmail?: string;
-  productName: string;
-  productId: string;
-  quantity: number;
-  total: string;
-  totalAmount: number;
-  date: string;
-  status: "Pending" | "Processing" | "Ready to Ship" | "Shipped" | "Delivered" | "Cancelled";
-  statusColor: string;
-  shippingAddress?: string;
-  paymentMethod?: string;
-}
-
+// UI-friendly representation for messages and notifications
 export interface SellerMessage {
   sender: "customer" | "seller";
   text: string;
@@ -83,462 +54,566 @@ export interface SellerNotification {
 }
 
 interface SellerContextType {
-  products: SellerProduct[];
+  products: SellerProductListing[];
+  auctions: any[]; // Add auctions array
   orders: SellerOrder[];
   conversations: SellerConversation[];
   notifications: SellerNotification[];
-  addProduct: (product: Omit<SellerProduct, "id" | "sales" | "createdAt" | "status" | "statusColor">) => Promise<void>;
-  updateProduct: (id: string, updates: Partial<SellerProduct>) => void;
-  deleteProduct: (id: string) => void;
-  updateOrderStatus: (orderId: string, status: SellerOrder["status"]) => void;
+  statistics: SellerStatistics;
+  loading: boolean;
+  
+  // Product management (Fixed-Price Listings)
+  loadProducts: () => Promise<void>;
+  addProduct: (product: {
+    name: string;
+    description: string;
+    category: string | number;
+    condition: string;
+    price?: number;
+    stock?: number;
+    images?: File[];
+    featured?: boolean;
+    discount_percentage?: number;
+    discount_start_date?: string;
+    discount_end_date?: string;
+  }) => Promise<void>;
+  updateProduct: (productId: number, listingId: number, updates: {
+    price?: number;
+    quantity?: number;
+    status?: 'active' | 'inactive';
+    discount_percentage?: number | null;
+    discount_start_date?: string | null;
+    discount_end_date?: string | null;
+  }) => Promise<void>;
+  deleteProduct: (productId: number) => Promise<void>;
+  
+  // Auction management
+  loadAuctions: () => Promise<void>;
+  addAuction: (auction: {
+    name: string;
+    description: string;
+    category: string | number;
+    condition: string;
+    starting_price: number;
+    duration: string;
+    images?: File[];
+  }) => Promise<void>;
+  deleteAuction: (auctionId: number) => Promise<void>;
+  
+  // Order management
+  loadOrders: () => Promise<void>;
+  updateOrderStatus: (orderId: number, status: OrderStatus) => Promise<void>;
+  markOrderShipped: (orderId: number) => Promise<void>;
+  getOrderById: (id: number) => SellerOrder | undefined;
+  
+  // Messaging
   sendMessage: (conversationId: number, message: string) => void;
   markConversationAsRead: (conversationId: number) => void;
+  
+  // Notifications
   markNotificationAsRead: (notificationId: string) => void;
   markAllNotificationsAsRead: () => void;
-  getProductById: (id: string) => SellerProduct | undefined;
-  getOrderById: (id: string) => SellerOrder | undefined;
+  
+  // Statistics
+  loadStatistics: () => Promise<void>;
 }
 
 const SellerContext = createContext<SellerContextType | undefined>(undefined);
 
 export function SellerProvider({ children }: { children: ReactNode }) {
-  const [products, setProducts] = useState<SellerProduct[]>([
-    {
-      id: "1",
-      name: "Hand-Embroidered Shawl",
-      category: "Textiles",
-      price: 3500,
-      stock: 12,
-      status: "Active",
-      statusColor: "bg-emerald-100 text-emerald-700",
-      image: "https://images.unsplash.com/photo-1601924994987-69e26d50dc26?w=300&h=300&fit=crop",
-      sales: 45,
-      description: "Beautiful hand-embroidered shawl made with traditional Pakistani craftsmanship",
-      material: "Pashmina Wool",
-      origin: "Multan",
-      createdAt: "2025-09-15",
-    },
-    {
-      id: "2",
-      name: "Blue Pottery Vase Set",
-      category: "Pottery",
-      price: 2800,
-      stock: 8,
-      status: "Active",
-      statusColor: "bg-emerald-100 text-emerald-700",
-      image: "https://images.unsplash.com/photo-1578500494198-246f612d3b3d?w=300&h=300&fit=crop",
-      sales: 32,
-      description: "Authentic blue pottery from Multan",
-      material: "Clay",
-      origin: "Multan",
-      createdAt: "2025-09-10",
-    },
-    {
-      id: "3",
-      name: "Brass Candle Holders",
-      category: "Metalwork",
-      price: 1900,
-      stock: 0,
-      status: "Out of Stock",
-      statusColor: "bg-red-100 text-red-700",
-      image: "https://images.unsplash.com/photo-1602874801006-94d67b8d6e2c?w=300&h=300&fit=crop",
-      sales: 28,
-      description: "Traditional brass candle holders",
-      material: "Brass",
-      origin: "Lahore",
-      createdAt: "2025-08-20",
-    },
-    {
-      id: "4",
-      name: "Handwoven Carpet",
-      category: "Textiles",
-      price: 12500,
-      stock: 3,
-      status: "Low Stock",
-      statusColor: "bg-amber-100 text-amber-700",
-      image: "https://images.unsplash.com/photo-1600166898405-da9535204843?w=300&h=300&fit=crop",
-      sales: 15,
-      description: "Premium handwoven carpet with intricate patterns",
-      material: "Wool",
-      origin: "Peshawar",
-      createdAt: "2025-07-05",
-    },
-    {
-      id: "5",
-      name: "Traditional Jewelry Set",
-      category: "Jewelry",
-      price: 5500,
-      stock: 20,
-      status: "Active",
-      statusColor: "bg-emerald-100 text-emerald-700",
-      image: "https://images.unsplash.com/photo-1611591437281-460bfbe1220a?w=300&h=300&fit=crop",
-      sales: 38,
-      description: "Elegant traditional jewelry with authentic craftsmanship",
-      material: "Gold Plated",
-      origin: "Karachi",
-      createdAt: "2025-08-01",
-    },
-  ]);
+  const { user } = useAuth();
+  const [products, setProducts] = useState<SellerProductListing[]>([]);
+  const [auctions, setAuctions] = useState<any[]>([]);
+  const [orders, setOrders] = useState<SellerOrder[]>([]);
+  const [conversations, setConversations] = useState<SellerConversation[]>([]);
+  const [notifications, setNotifications] = useState<SellerNotification[]>([]);
+  const [statistics, setStatistics] = useState<SellerStatistics>({
+    total_sales: 0,
+    total_orders: 0,
+    pending_orders: 0,
+    total_revenue: '0.00',
+    total_products: 0,
+    active_auctions: 0,
+  });
+  const [loading, setLoading] = useState(false);
 
-  const [orders, setOrders] = useState<SellerOrder[]>([
-    {
-      id: "ORD-2025-048",
-      customer: "Ahmed Khan",
-      customerEmail: "ahmed@example.com",
-      productName: "Hand-Embroidered Shawl",
-      productId: "1",
-      quantity: 2,
-      total: "PKR 7,000",
-      totalAmount: 7000,
-      date: "Oct 24, 2025",
-      status: "Pending",
-      statusColor: "bg-amber-100 text-amber-700",
-      shippingAddress: "123 Main St, Karachi",
-      paymentMethod: "Cash on Delivery",
-    },
-    {
-      id: "ORD-2025-047",
-      customer: "Fatima Ali",
-      customerEmail: "fatima@example.com",
-      productName: "Blue Pottery Vase Set",
-      productId: "2",
-      quantity: 1,
-      total: "PKR 2,800",
-      totalAmount: 2800,
-      date: "Oct 23, 2025",
-      status: "Processing",
-      statusColor: "bg-blue-100 text-blue-700",
-      shippingAddress: "456 Oak Ave, Lahore",
-      paymentMethod: "Credit Card",
-    },
-    {
-      id: "ORD-2025-046",
-      customer: "Hassan Raza",
-      customerEmail: "hassan@example.com",
-      productName: "Brass Candle Holders",
-      productId: "3",
-      quantity: 3,
-      total: "PKR 5,700",
-      totalAmount: 5700,
-      date: "Oct 22, 2025",
-      status: "Ready to Ship",
-      statusColor: "bg-purple-100 text-purple-700",
-      shippingAddress: "789 Pine Rd, Islamabad",
-      paymentMethod: "Cash on Delivery",
-    },
-    {
-      id: "ORD-2025-045",
-      customer: "Sara Malik",
-      customerEmail: "sara@example.com",
-      productName: "Handwoven Carpet",
-      productId: "4",
-      quantity: 1,
-      total: "PKR 12,500",
-      totalAmount: 12500,
-      date: "Oct 21, 2025",
-      status: "Pending",
-      statusColor: "bg-amber-100 text-amber-700",
-      shippingAddress: "321 Elm St, Multan",
-      paymentMethod: "Bank Transfer",
-    },
-    {
-      id: "ORD-2025-044",
-      customer: "Ali Haider",
-      customerEmail: "ali@example.com",
-      productName: "Traditional Jewelry Set",
-      productId: "5",
-      quantity: 1,
-      total: "PKR 5,500",
-      totalAmount: 5500,
-      date: "Oct 20, 2025",
-      status: "Processing",
-      statusColor: "bg-blue-100 text-blue-700",
-      shippingAddress: "654 Maple Dr, Faisalabad",
-      paymentMethod: "Credit Card",
-    },
-    {
-      id: "ORD-2025-043",
-      customer: "Zainab Ahmed",
-      customerEmail: "zainab@example.com",
-      productName: "Hand-Embroidered Shawl",
-      productId: "1",
-      quantity: 1,
-      total: "PKR 3,500",
-      totalAmount: 3500,
-      date: "Oct 18, 2025",
-      status: "Delivered",
-      statusColor: "bg-emerald-100 text-emerald-700",
-      shippingAddress: "987 Cedar Ln, Peshawar",
-      paymentMethod: "Cash on Delivery",
-    },
-    {
-      id: "ORD-2025-042",
-      customer: "Imran Shah",
-      customerEmail: "imran@example.com",
-      productName: "Blue Pottery Vase Set",
-      productId: "2",
-      quantity: 2,
-      total: "PKR 5,600",
-      totalAmount: 5600,
-      date: "Oct 17, 2025",
-      status: "Shipped",
-      statusColor: "bg-cyan-100 text-cyan-700",
-      shippingAddress: "147 Birch St, Sialkot",
-      paymentMethod: "Credit Card",
-    },
-  ]);
-
-  const [conversations, setConversations] = useState<SellerConversation[]>([
-    {
-      id: 0,
-      customer: "Ahmed Khan",
-      lastMessage: "Is this shawl available in blue color?",
-      time: "2 min ago",
-      unread: 2,
-      productImage: "https://images.unsplash.com/photo-1601924994987-69e26d50dc26?w=50&h=50&fit=crop",
-      messages: [
-        { sender: "customer", text: "Hi! I'm interested in your hand-embroidered shawl.", time: "10:30 AM" },
-        { sender: "seller", text: "Hello! Thank you for your interest. Which design are you looking at?", time: "10:32 AM" },
-        { sender: "customer", text: "The red one with golden embroidery. Is this shawl available in blue color?", time: "10:35 AM" },
-      ],
-    },
-    {
-      id: 1,
-      customer: "Fatima Ali",
-      lastMessage: "When will my order be shipped?",
-      time: "1 hour ago",
-      unread: 1,
-      productImage: "https://images.unsplash.com/photo-1578500494198-246f612d3b3d?w=50&h=50&fit=crop",
-      messages: [
-        { sender: "customer", text: "I placed an order yesterday. Order #ORD-2025-047", time: "9:00 AM" },
-        { sender: "seller", text: "Yes, I can see your order. It will be shipped within 24 hours.", time: "9:15 AM" },
-        { sender: "customer", text: "When will my order be shipped?", time: "10:00 AM" },
-      ],
-    },
-    {
-      id: 2,
-      customer: "Hassan Raza",
-      lastMessage: "Thank you for the beautiful candle holders!",
-      time: "3 hours ago",
-      unread: 0,
-      productImage: "https://images.unsplash.com/photo-1602874801006-94d67b8d6e2c?w=50&h=50&fit=crop",
-      messages: [
-        { sender: "customer", text: "Order received! The candle holders are beautiful!", time: "Yesterday" },
-        { sender: "seller", text: "I'm so glad you love them! Thank you for your purchase.", time: "Yesterday" },
-        { sender: "customer", text: "Thank you for the beautiful candle holders!", time: "Yesterday" },
-      ],
-    },
-    {
-      id: 3,
-      customer: "Sara Malik",
-      lastMessage: "Can you provide custom sizes for carpets?",
-      time: "1 day ago",
-      unread: 0,
-      productImage: "https://images.unsplash.com/photo-1600166898405-da9535204843?w=50&h=50&fit=crop",
-      messages: [
-        { sender: "customer", text: "Can you provide custom sizes for carpets?", time: "2 days ago" },
-      ],
-    },
-  ]);
-
-  const [notifications, setNotifications] = useState<SellerNotification[]>([
-    {
-      id: "notif-1",
-      type: "order",
-      title: "New Order Received",
-      message: "You have a new order #ORD-2025-048 for Hand-Embroidered Shawl",
-      time: "5 min ago",
-      read: false,
-    },
-    {
-      id: "notif-2",
-      type: "message",
-      title: "New Message",
-      message: "Ahmed Khan sent you a message about Hand-Embroidered Shawl",
-      time: "10 min ago",
-      read: false,
-    },
-    {
-      id: "notif-3",
-      type: "order",
-      title: "Order Ready to Ship",
-      message: "Order #ORD-2025-046 is ready to be shipped",
-      time: "2 hours ago",
-      read: false,
-    },
-    {
-      id: "notif-4",
-      type: "review",
-      title: "New Review",
-      message: "Hassan Raza left a 5-star review on Brass Candle Holders",
-      time: "1 day ago",
-      read: true,
-    },
-    {
-      id: "notif-5",
-      type: "system",
-      title: "Low Stock Alert",
-      message: "Brass Candle Holders is out of stock. Please update inventory.",
-      time: "2 days ago",
-      read: true,
-    },
-  ]);
-
-  // Load products from backend or use mock data
+  // Load products from backend (Fixed-Price Listings only)
   const loadProducts = async () => {
     if (MOCK_MODE) {
-      // In mock mode, products are already set from initial state
+      // Mock data
+      setProducts(getMockProducts());
       return;
     }
 
     try {
-      // In backend mode, fetch seller's listings
-      const response = await productService.getFixedPriceListings({ 
-        ordering: '-created_at', // Newest first
-        page_size: 50 
+      setLoading(true);
+      
+      // Get all fixed-price listings for this seller
+      const listingsResponse = await sellerService.getSellerListings({
+        ordering: '-created_at',
+        page_size: 100,
       });
       
-      // Convert backend data to SellerProduct format
-      const sellerProducts: SellerProduct[] = response.results.map(listing => ({
-        id: listing.id.toString(),
-        name: listing.product.name,
-        category: listing.product.category_name,
-        price: parseFloat(listing.price),
-        stock: listing.quantity,
-        sales: 0, // TODO: Get actual sales data
-        status: listing.quantity > 10 ? "Active" : listing.quantity > 0 ? "Low Stock" : "Out of Stock",
-        statusColor: listing.quantity > 10 
-          ? "bg-emerald-100 text-emerald-700"
-          : listing.quantity > 0 
-          ? "bg-amber-100 text-amber-700" 
-          : "bg-red-100 text-red-700",
-        createdAt: new Date(listing.created_at).toISOString().split("T")[0],
-        description: listing.product.description,
-        image: listing.product.images[0]?.image_url || '',
-        material: '', // TODO: Add material field to backend
-        origin: listing.product.region?.name || '',
-      }));
-
+      // Map listings to SellerProductListing format
+      const sellerProducts: SellerProductListing[] = listingsResponse.results.map((listing: FixedPriceListing) => {
+        return {
+          id: listing.product.id,
+          listingId: listing.id,
+          name: listing.product.name,
+          description: listing.product.description,
+          category: listing.product.category,
+          categoryName: listing.product.category_name,
+          condition: listing.product.condition,
+          images: listing.product.images.map(img => ({
+            id: img.id,
+            image_url: img.image_url || img.image,
+            is_primary: img.is_primary,
+          })),
+          listingType: 'fixed_price',
+          
+          // Fixed price listing fields
+          price: listing.price,
+          quantity: listing.quantity,
+          status: listing.status,
+          featured: listing.featured,
+          discount_percentage: listing.discount_percentage,
+          discount_start_date: listing.discount_start_date,
+          discount_end_date: listing.discount_end_date,
+          has_active_discount: listing.has_active_discount,
+          current_price: listing.current_price,
+          
+          created_at: listing.product.created_at,
+          updated_at: listing.product.updated_at,
+        };
+      });
+      
       setProducts(sellerProducts);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error loading products:', error);
-      toast.error('Failed to load products');
+      toast.error(error.response?.data?.message || 'Failed to load products');
+    } finally {
+      setLoading(false);
     }
   };
 
-  // Load products on component mount in backend mode
-  useEffect(() => {
-    if (!MOCK_MODE) {
-      loadProducts();
-    }
-  }, []);
-
-  const addProduct = async (productData: Omit<SellerProduct, "id" | "sales" | "createdAt" | "status" | "statusColor">) => {
+  // Load auctions from backend
+  const loadAuctions = async () => {
     if (MOCK_MODE) {
-      // Mock mode implementation
-      const newId = String(products.length + 1);
-      const status = productData.stock > 10 ? "Active" : productData.stock > 0 ? "Low Stock" : "Out of Stock";
-      const statusColor =
-        status === "Active"
-          ? "bg-emerald-100 text-emerald-700"
-          : status === "Low Stock"
-          ? "bg-amber-100 text-amber-700"
-          : "bg-red-100 text-red-700";
+      // Mock data - filter from stored auctions
+      const stored = localStorage.getItem('mock_auctions');
+      if (stored) {
+        try {
+          const allAuctions = JSON.parse(stored);
+          setAuctions(allAuctions.filter((a: any) => a.product.seller_username === user?.username));
+        } catch {
+          setAuctions([]);
+        }
+      }
+      return;
+    }
 
-      const newProduct: SellerProduct = {
-        ...productData,
-        id: newId,
-        sales: 0,
-        status,
-        statusColor,
-        createdAt: new Date().toISOString().split("T")[0],
+    try {
+      setLoading(true);
+      
+      // Get all auctions for this seller
+      const auctionsResponse = await sellerService.getSellerAuctions({
+        ordering: '-created_at',
+        page_size: 100,
+      });
+      
+      setAuctions(auctionsResponse.results);
+    } catch (error: any) {
+      console.error('Error loading auctions:', error);
+      toast.error(error.response?.data?.message || 'Failed to load auctions');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Load orders from backend
+  const loadOrders = async () => {
+    if (MOCK_MODE) {
+      setOrders(getMockOrders());
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const response = await sellerService.getSellerOrders({
+        ordering: '-created_at',
+        page_size: 100,
+      });
+      
+      setOrders(response.results);
+    } catch (error: any) {
+      console.error('Error loading orders:', error);
+      toast.error(error.response?.data?.message || 'Failed to load orders');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Load statistics
+  const loadStatistics = async () => {
+    if (MOCK_MODE) {
+      setStatistics(getMockStatistics(orders, products));
+      return;
+    }
+
+    try {
+      const stats = await sellerService.getSellerStatistics();
+      setStatistics(stats);
+    } catch (error: any) {
+      console.error('Error loading statistics:', error);
+      toast.error(error.response?.data?.message || 'Failed to load statistics');
+    }
+  };
+
+  // Load data on mount
+  useEffect(() => {
+    if (user && (user.role === 'seller' || user.role === 'both')) {
+      loadProducts();
+      loadAuctions();
+      loadOrders();
+      loadStatistics();
+    }
+  }, [user]);
+
+  // Add product
+  const addProduct = async (productData: {
+    name: string;
+    description: string;
+    category: string | number;
+    condition: string;
+    price?: number;
+    stock?: number;
+    images?: File[];
+    featured?: boolean;
+    discount_percentage?: number;
+    discount_start_date?: string;
+    discount_end_date?: string;
+  }) => {
+    if (MOCK_MODE) {
+      // Mock mode: convert Files to URLs for display
+      const imageUrls = productData.images?.map(file => URL.createObjectURL(file)) || [];
+      const newProduct: SellerProductListing = {
+        id: Math.floor(Math.random() * 10000),
+        name: productData.name,
+        description: productData.description,
+        category: typeof productData.category === 'string' 
+          ? getCategoryIdByName(productData.category) 
+          : productData.category,
+        categoryName: typeof productData.category === 'string' 
+          ? productData.category 
+          : 'Unknown',
+        condition: productData.condition,
+        images: imageUrls.map((url, idx) => ({
+          id: idx,
+          image_url: url,
+          is_primary: idx === 0,
+        })),
+        listingType: productData.price ? 'fixed_price' : null,
+        price: productData.price?.toString(),
+        quantity: productData.stock,
+        status: (productData.stock && productData.stock > 0) ? 'active' : 'out_of_stock',
+        featured: productData.featured || false,
+        discount_percentage: productData.discount_percentage?.toString(),
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
       };
-
-      // Add to beginning of array to show newest first
-      setProducts([newProduct, ...products]);
+      
+      setProducts(prev => [newProduct, ...prev]);
       toast.success('Product added successfully!');
       return;
     }
 
-    // Backend mode implementation
+    // Backend mode
     try {
-      // Map SellerProduct data to backend Product format
-      const backendProductData = {
-        name: productData.name,
-        description: productData.description || `${productData.name} - High quality product`,
-        category: getCategoryIdByName(productData.category),
-        condition: 'new' as const,
-        // Note: images would be handled separately
-      };
-
-      const createdProduct = await productService.createProduct(backendProductData);
+      // Step 1: Create the product
+      const categoryId = typeof productData.category === 'string' 
+        ? getCategoryIdByName(productData.category) 
+        : productData.category;
       
-      // Create a fixed-price listing for this product
-      const listingData = {
-        product_id: createdProduct.id,
-        price: productData.price,
-        quantity: productData.stock,
-      };
-
-      await productService.createFixedPriceListing(listingData);
+      const createdProduct = await productService.createProduct({
+        name: productData.name,
+        description: productData.description,
+        category: categoryId,
+        condition: productData.condition,
+        images: productData.images,
+      });
+      
+      // Step 2: If price and stock provided, create a fixed-price listing
+      if (productData.price && productData.stock !== undefined) {
+        await productService.createFixedPriceListing({
+          product_id: createdProduct.id,
+          price: productData.price,
+          quantity: productData.stock,
+          featured: productData.featured,
+          discount_percentage: productData.discount_percentage,
+          discount_start_date: productData.discount_start_date,
+          discount_end_date: productData.discount_end_date,
+        });
+      }
       
       toast.success('Product created successfully!');
       
-      // Refresh the products list
+      // Reload products
       await loadProducts();
       
     } catch (error: any) {
       console.error('Error creating product:', error);
       toast.error(error.response?.data?.message || 'Failed to create product');
+      throw error;
     }
   };
 
-  const updateProduct = (id: string, updates: Partial<SellerProduct>) => {
-    setProducts(products.map((product) => {
-      if (product.id === id) {
-        const updatedProduct = { ...product, ...updates };
-        
-        // Auto-update status based on stock
-        if (updates.stock !== undefined) {
-          if (updates.stock > 10) {
-            updatedProduct.status = "Active";
-            updatedProduct.statusColor = "bg-emerald-100 text-emerald-700";
-          } else if (updates.stock > 0) {
-            updatedProduct.status = "Low Stock";
-            updatedProduct.statusColor = "bg-amber-100 text-amber-700";
-          } else {
-            updatedProduct.status = "Out of Stock";
-            updatedProduct.statusColor = "bg-red-100 text-red-700";
-          }
+  // Update product (updates the fixed-price listing)
+  const updateProduct = async (
+    productId: number, 
+    listingId: number, 
+    updates: {
+      price?: number;
+      quantity?: number;
+      status?: 'active' | 'inactive';
+    }
+  ) => {
+    if (MOCK_MODE) {
+      setProducts(prev => prev.map(p => {
+        if (p.id === productId) {
+          return {
+            ...p,
+            price: updates.price?.toString() || p.price,
+            quantity: updates.quantity ?? p.quantity,
+            status: updates.status || p.status,
+          };
         }
-        
-        return updatedProduct;
+        return p;
+      }));
+      toast.success('Product updated successfully!');
+      return;
+    }
+
+    try {
+      await sellerService.updateListing(listingId, updates);
+      toast.success('Product updated successfully!');
+      await loadProducts();
+    } catch (error: any) {
+      console.error('Error updating product:', error);
+      toast.error(error.response?.data?.message || 'Failed to update product');
+      throw error;
+    }
+  };
+
+  // Delete product
+  const deleteProduct = async (productId: number) => {
+    if (MOCK_MODE) {
+      setProducts(prev => prev.filter(p => p.id !== productId));
+      toast.success('Product deleted successfully!');
+      return;
+    }
+
+    try {
+      await sellerService.deleteProduct(productId);
+      toast.success('Product deleted successfully!');
+      await loadProducts();
+    } catch (error: any) {
+      console.error('Error deleting product:', error);
+      toast.error(error.response?.data?.message || 'Failed to delete product');
+      throw error;
+    }
+  };
+
+  // Add auction
+  const addAuction = async (auctionData: {
+    name: string;
+    description: string;
+    category: string | number;
+    condition: string;
+    starting_price: number;
+    duration: string;
+    images?: File[];
+  }) => {
+    if (MOCK_MODE) {
+      // Mock mode implementation
+      const imageUrls = auctionData.images?.map(file => URL.createObjectURL(file)) || [];
+      const newId = Math.max(0, ...auctions.map(a => a.id)) + 1;
+      const endTime = new Date();
+      endTime.setHours(endTime.getHours() + parseInt(auctionData.duration.split(' ')[0]));
+
+      const newAuction = {
+        id: newId,
+        product: {
+          id: newId,
+          name: auctionData.name,
+          description: auctionData.description,
+          condition: auctionData.condition,
+          listing_type: 'auction',
+          images: imageUrls.map((url: string, index: number) => ({
+            id: index + 1,
+            image: url,
+            image_url: url,
+            is_primary: index === 0,
+            order: index
+          })),
+          seller_username: user?.username || 'seller',
+          category_name: typeof auctionData.category === 'string' ? auctionData.category : 'Unknown',
+          seller: user?.id || 1,
+          category: typeof auctionData.category === 'number' ? auctionData.category : 1,
+          average_rating: null,
+          total_reviews: 0,
+          seller_profile: null,
+          region: { id: 1, name: 'Unknown' },
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        },
+        starting_price: auctionData.starting_price.toString(),
+        current_price: auctionData.starting_price.toString(),
+        start_time: new Date().toISOString(),
+        end_time: endTime.toISOString(),
+        status: 'active',
+        winner: null,
+        winner_username: null,
+        latest_bids: [],
+        total_bids: 0,
+        time_remaining: parseInt(auctionData.duration.split(' ')[0]) * 60 * 60,
+        created_at: new Date().toISOString(),
+      };
+
+      const updatedAuctions = [...auctions, newAuction];
+      setAuctions(updatedAuctions);
+      
+      // Also update localStorage if using mock auctions
+      const allStoredAuctions = JSON.parse(localStorage.getItem('mock_auctions') || '[]');
+      localStorage.setItem('mock_auctions', JSON.stringify([...allStoredAuctions, newAuction]));
+      
+      toast.success('Auction created successfully!');
+      return;
+    }
+
+    // Backend mode - create product first, then auction
+    try {
+      const categoryId = typeof auctionData.category === 'string' 
+        ? getCategoryIdByName(auctionData.category) 
+        : auctionData.category;
+      
+      // Step 1: Create the product
+      const createdProduct = await productService.createProduct({
+        name: auctionData.name,
+        description: auctionData.description,
+        category: categoryId,
+        condition: auctionData.condition,
+        images: auctionData.images,
+      });
+      
+      // Step 2: Create the auction
+      const startTime = new Date().toISOString();
+      const endTime = new Date(Date.now() + getDurationInMs(auctionData.duration)).toISOString();
+      
+      await productService.createAuction({
+        product_id: createdProduct.id,
+        starting_price: auctionData.starting_price,
+        start_time: startTime,
+        end_time: endTime,
+      });
+      
+      toast.success('Auction created successfully!');
+      
+      // Reload auctions
+      await loadAuctions();
+      
+    } catch (error: any) {
+      console.error('Error creating auction:', error);
+      toast.error(error.response?.data?.message || 'Failed to create auction');
+      throw error;
+    }
+  };
+
+  // Helper function to convert duration string to milliseconds
+  const getDurationInMs = (duration: string): number => {
+    switch (duration) {
+      case '24 hours': return 24 * 60 * 60 * 1000;
+      case '48 hours': return 48 * 60 * 60 * 1000;
+      case '72 hours': return 72 * 60 * 60 * 1000;
+      case '1 week': return 7 * 24 * 60 * 60 * 1000;
+      default: return 24 * 60 * 60 * 1000;
+    }
+  };
+
+  // Delete auction (by deleting the base product)
+  const deleteAuction = async (auctionId: number) => {
+    if (MOCK_MODE) {
+      setAuctions(prev => prev.filter(a => a.id !== auctionId));
+      
+      // Also update localStorage
+      const allStoredAuctions = JSON.parse(localStorage.getItem('mock_auctions') || '[]');
+      const updatedStored = allStoredAuctions.filter((a: any) => a.id !== auctionId);
+      localStorage.setItem('mock_auctions', JSON.stringify(updatedStored));
+      
+      toast.success('Auction deleted successfully!');
+      return;
+    }
+
+    try {
+      const auction = auctions.find(a => a.id === auctionId);
+      if (!auction) {
+        toast.error('Auction not found');
+        return;
       }
-      return product;
-    }));
+      
+      // Delete the product (which will cascade delete the auction)
+      await sellerService.deleteProduct(auction.product.id);
+      toast.success('Auction deleted successfully!');
+      await loadAuctions();
+    } catch (error: any) {
+      console.error('Error deleting auction:', error);
+      toast.error(error.response?.data?.message || 'Failed to delete auction');
+      throw error;
+    }
   };
 
-  const deleteProduct = (id: string) => {
-    setProducts(products.filter((product) => product.id !== id));
+  // Update order status (mark as shipped)
+  const updateOrderStatus = async (orderId: number, status: OrderStatus) => {
+    // For now, only 'shipped' status update is supported
+    if (status === 'shipped') {
+      return markOrderShipped(orderId);
+    }
+    
+    toast.error('Only marking orders as shipped is currently supported');
   };
 
-  const updateOrderStatus = (orderId: string, status: SellerOrder["status"]) => {
-    const statusColorMap: Record<SellerOrder["status"], string> = {
-      Pending: "bg-amber-100 text-amber-700",
-      Processing: "bg-blue-100 text-blue-700",
-      "Ready to Ship": "bg-purple-100 text-purple-700",
-      Shipped: "bg-cyan-100 text-cyan-700",
-      Delivered: "bg-emerald-100 text-emerald-700",
-      Cancelled: "bg-red-100 text-red-700",
-    };
+  // Mark order as shipped
+  const markOrderShipped = async (orderId: number) => {
+    if (MOCK_MODE) {
+      setOrders(prev => prev.map(order => {
+        if (order.id === orderId) {
+          return {
+            ...order,
+            status: 'shipped' as OrderStatus,
+            shipped_at: new Date().toISOString(),
+          };
+        }
+        return order;
+      }));
+      toast.success('Order marked as shipped!');
+      return;
+    }
 
-    setOrders(orders.map((order) =>
-      order.id === orderId
-        ? { ...order, status, statusColor: statusColorMap[status] }
-        : order
-    ));
+    try {
+      await sellerService.markOrderShipped(orderId);
+      toast.success('Order marked as shipped!');
+      await loadOrders();
+    } catch (error: any) {
+      console.error('Error marking order as shipped:', error);
+      toast.error(error.response?.data?.error || 'Failed to mark order as shipped');
+      throw error;
+    }
   };
 
+  const getOrderById = (id: number) => {
+    return orders.find((order) => order.id === id);
+  };
+
+  // Message handling (mock for now)
   const sendMessage = (conversationId: number, messageText: string) => {
     setConversations(conversations.map((conv) => {
       if (conv.id === conversationId) {
@@ -564,6 +639,7 @@ export function SellerProvider({ children }: { children: ReactNode }) {
     ));
   };
 
+  // Notification handling (mock for now)
   const markNotificationAsRead = (notificationId: string) => {
     setNotifications(notifications.map((notif) =>
       notif.id === notificationId ? { ...notif, read: true } : notif
@@ -574,31 +650,32 @@ export function SellerProvider({ children }: { children: ReactNode }) {
     setNotifications(notifications.map((notif) => ({ ...notif, read: true })));
   };
 
-  const getProductById = (id: string) => {
-    return products.find((product) => product.id === id);
-  };
-
-  const getOrderById = (id: string) => {
-    return orders.find((order) => order.id === id);
-  };
-
   return (
     <SellerContext.Provider
       value={{
         products,
+        auctions,
         orders,
         conversations,
         notifications,
+        statistics,
+        loading,
+        loadProducts,
         addProduct,
         updateProduct,
         deleteProduct,
+        loadAuctions,
+        addAuction,
+        deleteAuction,
+        loadOrders,
         updateOrderStatus,
+        markOrderShipped,
+        getOrderById,
         sendMessage,
         markConversationAsRead,
         markNotificationAsRead,
         markAllNotificationsAsRead,
-        getProductById,
-        getOrderById,
+        loadStatistics,
       }}
     >
       {children}
@@ -612,4 +689,109 @@ export function useSeller() {
     throw new Error("useSeller must be used within a SellerProvider");
   }
   return context;
+}
+
+// Mock data generators
+function getMockProducts(): SellerProductListing[] {
+  return [
+    {
+      id: 1,
+      listingId: 1,
+      name: "Hand-Embroidered Shawl",
+      description: "Beautiful hand-embroidered shawl",
+      category: 1,
+      categoryName: "Textiles",
+      condition: "new",
+      images: [{
+        id: 1,
+        image_url: "https://images.unsplash.com/photo-1601924994987-69e26d50dc26?w=300&h=300&fit=crop",
+        is_primary: true,
+      }],
+      listingType: 'fixed_price',
+      price: "3500.00",
+      quantity: 12,
+      status: 'active',
+      featured: false,
+      current_price: "3500.00",
+      created_at: "2025-09-15T00:00:00Z",
+      updated_at: "2025-09-15T00:00:00Z",
+    },
+    {
+      id: 2,
+      listingId: 2,
+      name: "Blue Pottery Vase Set",
+      description: "Authentic blue pottery from Multan",
+      category: 3,
+      categoryName: "Pottery",
+      condition: "new",
+      images: [{
+        id: 2,
+        image_url: "https://images.unsplash.com/photo-1578500494198-246f612d3b3d?w=300&h=300&fit=crop",
+        is_primary: true,
+      }],
+      listingType: 'fixed_price',
+      price: "2800.00",
+      quantity: 8,
+      status: 'active',
+      featured: false,
+      current_price: "2800.00",
+      created_at: "2025-09-10T00:00:00Z",
+      updated_at: "2025-09-10T00:00:00Z",
+    },
+  ];
+}
+
+function getMockOrders(): SellerOrder[] {
+  return [
+    {
+      id: 1,
+      order_number: "FXD-ABC123",
+      buyer: 10,
+      buyer_username: "ahmed_khan",
+      seller: 5,
+      seller_username: "seller1",
+      product: 1,
+      product_name: "Hand-Embroidered Shawl",
+      order_type: 'fixed_price',
+      quantity: 2,
+      unit_price: "3500.00",
+      total_amount: "7000.00",
+      platform_fee: "140.00",
+      seller_amount: "6860.00",
+      shipping_address: 1,
+      shipping_address_detail: {
+        id: 1,
+        street_address: "123 Main St",
+        city: 1,
+        city_name: "Karachi",
+        province_name: "Sindh",
+        postal_code: "75500",
+        is_default: true,
+      },
+      status: 'paid',
+      payment_url: "",
+      payment_deadline: "2025-11-15T00:00:00Z",
+      created_at: "2025-11-14T10:00:00Z",
+      paid_at: "2025-11-14T10:30:00Z",
+      shipped_at: null,
+      delivered_at: null,
+    },
+  ];
+}
+
+function getMockStatistics(orders: SellerOrder[], products: SellerProductListing[]): SellerStatistics {
+  const totalOrders = orders.length;
+  const pendingOrders = orders.filter(o => o.status === 'paid').length;
+  const totalRevenue = orders
+    .filter(o => o.status === 'paid' || o.status === 'shipped' || o.status === 'delivered')
+    .reduce((sum, o) => sum + parseFloat(o.seller_amount), 0);
+  
+  return {
+    total_sales: totalOrders,
+    total_orders: totalOrders,
+    pending_orders: pendingOrders,
+    total_revenue: totalRevenue.toFixed(2),
+    total_products: products.length,
+    active_auctions: 0,
+  };
 }

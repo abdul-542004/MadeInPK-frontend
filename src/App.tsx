@@ -157,6 +157,7 @@ function AppContent() {
               onClearSearch={() => setSearchQuery("")}
               categoryId={selectedCategoryId}
               onCategoryChange={setSelectedCategoryId}
+              onListingClick={handleListingSelect}
             />
           } 
         />

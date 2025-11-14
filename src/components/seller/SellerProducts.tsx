@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Search, Edit, Trash2, Eye, MoreVertical } from "lucide-react";
+import { Search, Edit, Trash2, Eye, MoreVertical, X, Upload } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
@@ -31,121 +31,207 @@ import {
   AlertDialogTitle,
 } from "../ui/alert-dialog";
 import { toast } from "sonner";
-import { useSeller, SellerProduct } from "../../contexts/SellerContext";
+import { useSeller } from "../../contexts/SellerContext";
+import { SellerProductListing } from "../../types/seller";
 import { productService } from "../../services/productService";
-import { MOCK_MODE } from "../../lib/mockMode";
-import { useAuth } from "../../contexts/AuthContext";
 
 interface SellerProductsProps {
   onAddProduct: () => void;
 }
 
+// Helper function to get status badge color
+const getStatusColor = (status?: string): string => {
+  if (!status) return "bg-gray-100 text-gray-700";
+  
+  switch (status) {
+    case 'active':
+      return "bg-emerald-100 text-emerald-700";
+    case 'inactive':
+      return "bg-gray-100 text-gray-700";
+    case 'out_of_stock':
+      return "bg-red-100 text-red-700";
+    default:
+      return "bg-gray-100 text-gray-700";
+  }
+};
+
+// Helper function to get status label
+const getStatusLabel = (status?: string): string => {
+  if (!status) return "Draft";
+  return status.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase());
+};
+
 export function SellerProducts({ onAddProduct }: SellerProductsProps) {
-  const { user } = useAuth();
-  const { products: contextProducts, updateProduct, deleteProduct } = useSeller();
-  const [products, setProducts] = useState<SellerProduct[]>(contextProducts);
+  const { products, updateProduct, deleteProduct } = useSeller();
   const [searchQuery, setSearchQuery] = useState("");
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    loadProducts();
-  }, [user]);
-
-  const loadProducts = async () => {
-    if (MOCK_MODE || !user) {
-      // Use mock data from context
-      setProducts(contextProducts);
-      setLoading(false);
-      return;
-    }
-
-    // Backend mode
-    try {
-      setLoading(true);
-      const response = await productService.getProducts({ seller: user.id });
-      // Map backend products to SellerProduct format if needed
-      const mappedProducts = response.results.map(p => ({
-        id: p.id.toString(),
-        name: p.name,
-        price: parseFloat(p.listing_type === 'auction' ? '0' : '0'), // Would need price from listing
-        stock: 0, // Would need stock from listing
-        status: p.images.length > 0 ? 'Active' : 'Draft',
-        category: p.category_name,
-        image: p.images[0]?.image_url || '',
-      }));
-      setProducts(mappedProducts as any);
-    } catch (error: any) {
-      console.error('Error loading products:', error);
-      toast.error(error.response?.data?.message || 'Failed to load products');
-      // Fallback to context products
-      setProducts(contextProducts);
-    } finally {
-      setLoading(false);
-    }
-  };
-  const [editingProduct, setEditingProduct] = useState<SellerProduct | null>(null);
-  const [viewingProduct, setViewingProduct] = useState<SellerProduct | null>(null);
-  const [deletingProductId, setDeletingProductId] = useState<string | null>(null);
+  const [editingProduct, setEditingProduct] = useState<SellerProductListing | null>(null);
+  const [viewingProduct, setViewingProduct] = useState<SellerProductListing | null>(null);
+  const [deletingProductId, setDeletingProductId] = useState<number | null>(null);
   
   // Edit form state
   const [editName, setEditName] = useState("");
   const [editPrice, setEditPrice] = useState("");
   const [editStock, setEditStock] = useState("");
   const [editDescription, setEditDescription] = useState("");
+  const [editHasDiscount, setEditHasDiscount] = useState(false);
+  const [editDiscountPercentage, setEditDiscountPercentage] = useState("");
+  const [editDiscountStartDate, setEditDiscountStartDate] = useState("");
+  const [editDiscountEndDate, setEditDiscountEndDate] = useState("");
+  
+  // Image management state
+  const [newImageFiles, setNewImageFiles] = useState<File[]>([]);
+  const [newImagePreviews, setNewImagePreviews] = useState<string[]>([]);
+  const [deletingImageIds, setDeletingImageIds] = useState<number[]>([]);
 
-  const handleDelete = async (id: string) => {
-    if (MOCK_MODE) {
-      deleteProduct(id);
-      toast.success("Product deleted successfully!");
-    } else {
-      // Backend mode - delete via API and refresh
-      try {
-        await productService.deleteProduct(Number(id));
-        toast.success("Product deleted successfully!");
-        // Refresh the products list
-        await loadProducts();
-      } catch (error: any) {
-        console.error('Error deleting product:', error);
-        toast.error(error.response?.data?.message || 'Failed to delete product');
-      }
+  // Filter to show only fixed-price products
+  const fixedPriceProducts = products.filter(p => p.listingType === 'fixed_price' || p.price !== undefined);
+
+  const handleDelete = async (id: number) => {
+    try {
+      await deleteProduct(id);
+    } catch (error) {
+      // Error already handled in context
     }
     setDeletingProductId(null);
   };
 
-  const handleEdit = (product: SellerProduct) => {
+  const handleEdit = (product: SellerProductListing) => {
     setEditingProduct(product);
     setEditName(product.name);
-    setEditPrice(String(product.price));
-    setEditStock(String(product.stock));
+    setEditPrice(product.price || "0");
+    setEditStock(String(product.quantity || 0));
     setEditDescription(product.description || "");
+    
+    // Set discount fields
+    const hasDiscount = Boolean(product.discount_percentage);
+    setEditHasDiscount(hasDiscount);
+    setEditDiscountPercentage(product.discount_percentage || "");
+    
+    // Format dates for datetime-local input
+    if (product.discount_start_date) {
+      const startDate = new Date(product.discount_start_date);
+      setEditDiscountStartDate(startDate.toISOString().slice(0, 16));
+    } else {
+      setEditDiscountStartDate("");
+    }
+    
+    if (product.discount_end_date) {
+      const endDate = new Date(product.discount_end_date);
+      setEditDiscountEndDate(endDate.toISOString().slice(0, 16));
+    } else {
+      setEditDiscountEndDate("");
+    }
+    
+    // Reset image state
+    setNewImageFiles([]);
+    setNewImagePreviews([]);
+    setDeletingImageIds([]);
   };
 
-  const handleView = (product: SellerProduct) => {
+  const handleAddNewImages = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(event.target.files || []);
+    if (!editingProduct) return;
+    
+    const currentImageCount = (editingProduct.images?.length || 0) - deletingImageIds.length;
+    const totalImages = currentImageCount + newImageFiles.length + files.length;
+    
+    if (totalImages > 4) {
+      toast.error(`Maximum 4 images allowed. You can add ${4 - currentImageCount - newImageFiles.length} more.`);
+      return;
+    }
+    
+    // Create preview URLs
+    const newPreviews = files.map(file => URL.createObjectURL(file));
+    setNewImageFiles([...newImageFiles, ...files]);
+    setNewImagePreviews([...newImagePreviews, ...newPreviews]);
+  };
+
+  const handleRemoveNewImage = (index: number) => {
+    URL.revokeObjectURL(newImagePreviews[index]);
+    setNewImageFiles(newImageFiles.filter((_, i) => i !== index));
+    setNewImagePreviews(newImagePreviews.filter((_, i) => i !== index));
+  };
+
+  const handleMarkImageForDeletion = (imageId: number) => {
+    if (!editingProduct) return;
+    
+    const remainingImages = (editingProduct.images?.length || 0) - deletingImageIds.length - 1 + newImageFiles.length;
+    
+    if (remainingImages < 1) {
+      toast.error("Product must have at least one image");
+      return;
+    }
+    
+    setDeletingImageIds([...deletingImageIds, imageId]);
+  };
+
+  const handleUnmarkImageForDeletion = (imageId: number) => {
+    setDeletingImageIds(deletingImageIds.filter(id => id !== imageId));
+  };
+
+  const handleView = (product: SellerProductListing) => {
     setViewingProduct(product);
   };
 
-  const handleSaveEdit = () => {
-    if (!editingProduct) return;
+  const handleSaveEdit = async () => {
+    if (!editingProduct || !editingProduct.listingId) return;
     
     if (!editName || !editPrice || !editStock) {
       toast.error("Please fill in all required fields");
       return;
     }
+    
+    // Validate discount fields if enabled
+    if (editHasDiscount) {
+      if (!editDiscountPercentage || !editDiscountStartDate || !editDiscountEndDate) {
+        toast.error("Please fill in all discount fields or disable discount");
+        return;
+      }
+    }
 
-    updateProduct(editingProduct.id, {
-      name: editName,
-      price: Number(editPrice),
-      stock: Number(editStock),
-      description: editDescription,
-    });
-
-    toast.success("Product updated successfully!");
-    setEditingProduct(null);
+    try {
+      // Update product listing details
+      await updateProduct(editingProduct.id, editingProduct.listingId, {
+        price: Number(editPrice),
+        quantity: Number(editStock),
+        discount_percentage: editHasDiscount ? Number(editDiscountPercentage) : null,
+        discount_start_date: editHasDiscount ? new Date(editDiscountStartDate).toISOString() : null,
+        discount_end_date: editHasDiscount ? new Date(editDiscountEndDate).toISOString() : null,
+      });
+      
+      // Delete marked images
+      for (const imageId of deletingImageIds) {
+        try {
+          await productService.deleteProductImage(editingProduct.id, imageId);
+        } catch (error) {
+          console.error('Error deleting image:', error);
+          toast.error('Failed to delete some images');
+        }
+      }
+      
+      // Add new images
+      for (const imageFile of newImageFiles) {
+        try {
+          await productService.addProductImage(editingProduct.id, imageFile);
+        } catch (error) {
+          console.error('Error adding image:', error);
+          toast.error('Failed to add some images');
+        }
+      }
+      
+      // Clean up preview URLs
+      newImagePreviews.forEach(url => URL.revokeObjectURL(url));
+      
+      toast.success("Product updated successfully");
+      setEditingProduct(null);
+    } catch (error) {
+      // Error already handled in context
+    }
   };
 
-  const filteredProducts = products.filter((product) =>
+  const filteredProducts = fixedPriceProducts.filter((product) =>
     product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    product.category.toLowerCase().includes(searchQuery.toLowerCase())
+    product.categoryName.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   return (
@@ -153,8 +239,8 @@ export function SellerProducts({ onAddProduct }: SellerProductsProps) {
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-gray-900 mb-1">My Products</h1>
-          <p className="text-gray-600">Manage your product listings</p>
+          <h1 className="text-gray-900 mb-1">Fixed-Price Products</h1>
+          <p className="text-gray-600">Manage your fixed-price product listings</p>
         </div>
         <Button onClick={onAddProduct} className="bg-emerald-700 hover:bg-emerald-800">
           + Add New Product
@@ -181,7 +267,7 @@ export function SellerProducts({ onAddProduct }: SellerProductsProps) {
       {/* Products Table */}
       <Card className="border-gray-200">
         <CardHeader className="border-b border-gray-200">
-          <CardTitle className="text-gray-900">All Products ({filteredProducts.length})</CardTitle>
+          <CardTitle className="text-gray-900">Fixed-Price Listings ({filteredProducts.length})</CardTitle>
         </CardHeader>
         <CardContent className="p-0">
           <div className="overflow-x-auto">
@@ -217,7 +303,7 @@ export function SellerProducts({ onAddProduct }: SellerProductsProps) {
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
                         <img
-                          src={product.image}
+                          src={product.images[0]?.image_url || "https://via.placeholder.com/48"}
                           alt={product.name}
                           className="w-12 h-12 rounded-lg object-cover"
                         />
@@ -225,19 +311,21 @@ export function SellerProducts({ onAddProduct }: SellerProductsProps) {
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="text-sm text-gray-700">{product.category}</span>
+                      <span className="text-sm text-gray-700">{product.categoryName}</span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="text-sm text-gray-900">PKR {product.price.toLocaleString()}</span>
+                      <span className="text-sm text-gray-900">
+                        PKR {product.price ? parseFloat(product.price).toLocaleString() : 'N/A'}
+                      </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="text-sm text-gray-700">{product.stock}</span>
+                      <span className="text-sm text-gray-700">{product.quantity || 0}</span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="text-sm text-gray-700">{product.sales}</span>
+                      <span className="text-sm text-gray-700">-</span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <Badge className={`${product.statusColor}`}>{product.status}</Badge>
+                      <Badge className={getStatusColor(product.status)}>{getStatusLabel(product.status)}</Badge>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <DropdownMenu>
@@ -296,7 +384,9 @@ export function SellerProducts({ onAddProduct }: SellerProductsProps) {
                 value={editName}
                 onChange={(e) => setEditName(e.target.value)}
                 className="mt-1"
+                disabled
               />
+              <p className="text-xs text-gray-500 mt-1">Product name cannot be changed</p>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
@@ -327,7 +417,161 @@ export function SellerProducts({ onAddProduct }: SellerProductsProps) {
                 value={editDescription}
                 onChange={(e) => setEditDescription(e.target.value)}
                 className="mt-1 min-h-24"
+                disabled
               />
+              <p className="text-xs text-gray-500 mt-1">Description cannot be changed</p>
+            </div>
+
+            {/* Discount Options */}
+            <div className="border-t pt-4">
+              <div className="flex items-center gap-2 mb-3">
+                <input
+                  type="checkbox"
+                  id="edit-hasDiscount"
+                  checked={editHasDiscount}
+                  onChange={(e) => setEditHasDiscount(e.target.checked)}
+                  className="h-4 w-4 rounded border-gray-300 text-emerald-700 focus:ring-emerald-500"
+                />
+                <Label htmlFor="edit-hasDiscount" className="cursor-pointer">
+                  Enable Discount
+                </Label>
+              </div>
+
+              {editHasDiscount && (
+                <div className="space-y-3 pl-6 border-l-2 border-gray-200">
+                  <div>
+                    <Label htmlFor="edit-discountPercentage">Discount Percentage (%)</Label>
+                    <Input
+                      id="edit-discountPercentage"
+                      type="number"
+                      min="1"
+                      max="99"
+                      value={editDiscountPercentage}
+                      onChange={(e) => setEditDiscountPercentage(e.target.value)}
+                      className="mt-1"
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <Label htmlFor="edit-discountStartDate">Start Date & Time</Label>
+                      <Input
+                        id="edit-discountStartDate"
+                        type="datetime-local"
+                        value={editDiscountStartDate}
+                        onChange={(e) => setEditDiscountStartDate(e.target.value)}
+                        className="mt-1"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="edit-discountEndDate">End Date & Time</Label>
+                      <Input
+                        id="edit-discountEndDate"
+                        type="datetime-local"
+                        value={editDiscountEndDate}
+                        onChange={(e) => setEditDiscountEndDate(e.target.value)}
+                        className="mt-1"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Image Management */}
+            <div className="border-t pt-4">
+              <Label className="text-base font-semibold mb-3 block">Product Images</Label>
+              
+              {/* Current Images */}
+              <div className="space-y-2 mb-4">
+                <p className="text-sm text-gray-600">Current Images:</p>
+                <div className="grid grid-cols-4 gap-3">
+                  {editingProduct?.images?.map((image) => (
+                    <div key={image.id} className="relative group">
+                      <img
+                        src={image.image_url}
+                        alt="Product"
+                        className={`w-full h-24 object-cover rounded-lg border-2 ${
+                          deletingImageIds.includes(image.id)
+                            ? 'border-red-500 opacity-50'
+                            : 'border-gray-200'
+                        }`}
+                      />
+                      {deletingImageIds.includes(image.id) ? (
+                        <button
+                          type="button"
+                          onClick={() => handleUnmarkImageForDeletion(image.id)}
+                          className="absolute -top-2 -right-2 bg-green-500 text-white rounded-full p-1 shadow-md hover:bg-green-600"
+                          title="Keep this image"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => handleMarkImageForDeletion(image.id)}
+                          className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 shadow-md hover:bg-red-600 opacity-0 group-hover:opacity-100 transition-opacity"
+                          title="Delete this image"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      )}
+                      {image.is_primary && (
+                        <Badge className="absolute bottom-1 left-1 text-xs bg-emerald-700">
+                          Primary
+                        </Badge>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* New Images Preview */}
+              {newImagePreviews.length > 0 && (
+                <div className="space-y-2 mb-4">
+                  <p className="text-sm text-gray-600">New Images to Add:</p>
+                  <div className="grid grid-cols-4 gap-3">
+                    {newImagePreviews.map((preview, index) => (
+                      <div key={index} className="relative group">
+                        <img
+                          src={preview}
+                          alt={`New ${index + 1}`}
+                          className="w-full h-24 object-cover rounded-lg border-2 border-green-300"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveNewImage(index)}
+                          className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 shadow-md hover:bg-red-600"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                        <Badge className="absolute bottom-1 left-1 text-xs bg-green-600">
+                          New
+                        </Badge>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Add Images Button */}
+              {editingProduct && 
+                ((editingProduct.images?.length || 0) - deletingImageIds.length + newImageFiles.length < 4) && (
+                <div>
+                  <label className="flex items-center justify-center gap-2 px-4 py-3 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-emerald-500 hover:bg-emerald-50 transition-colors">
+                    <Upload className="h-5 w-5 text-gray-500" />
+                    <span className="text-sm text-gray-600">
+                      Add More Images ({4 - ((editingProduct.images?.length || 0) - deletingImageIds.length + newImageFiles.length)} remaining)
+                    </span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      onChange={handleAddNewImages}
+                      className="hidden"
+                    />
+                  </label>
+                </div>
+              )}
             </div>
           </div>
           <DialogFooter>
@@ -350,7 +594,7 @@ export function SellerProducts({ onAddProduct }: SellerProductsProps) {
           {viewingProduct && (
             <div className="space-y-4">
               <img
-                src={viewingProduct.image}
+                src={viewingProduct.images[0]?.image_url || "https://via.placeholder.com/400"}
                 alt={viewingProduct.name}
                 className="w-full h-64 object-cover rounded-lg"
               />
@@ -361,36 +605,26 @@ export function SellerProducts({ onAddProduct }: SellerProductsProps) {
                 </div>
                 <div>
                   <p className="text-sm text-gray-600">Category</p>
-                  <p className="text-gray-900">{viewingProduct.category}</p>
+                  <p className="text-gray-900">{viewingProduct.categoryName}</p>
                 </div>
                 <div>
                   <p className="text-sm text-gray-600">Price</p>
-                  <p className="text-gray-900">PKR {viewingProduct.price.toLocaleString()}</p>
+                  <p className="text-gray-900">
+                    PKR {viewingProduct.price ? parseFloat(viewingProduct.price).toLocaleString() : 'N/A'}
+                  </p>
                 </div>
                 <div>
                   <p className="text-sm text-gray-600">Stock</p>
-                  <p className="text-gray-900">{viewingProduct.stock}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-gray-600">Sales</p>
-                  <p className="text-gray-900">{viewingProduct.sales}</p>
+                  <p className="text-gray-900">{viewingProduct.quantity || 0}</p>
                 </div>
                 <div>
                   <p className="text-sm text-gray-600">Status</p>
-                  <Badge className={viewingProduct.statusColor}>{viewingProduct.status}</Badge>
+                  <Badge className={getStatusColor(viewingProduct.status)}>{getStatusLabel(viewingProduct.status)}</Badge>
                 </div>
-                {viewingProduct.material && (
-                  <div>
-                    <p className="text-sm text-gray-600">Material</p>
-                    <p className="text-gray-900">{viewingProduct.material}</p>
-                  </div>
-                )}
-                {viewingProduct.origin && (
-                  <div>
-                    <p className="text-sm text-gray-600">Origin</p>
-                    <p className="text-gray-900">{viewingProduct.origin}</p>
-                  </div>
-                )}
+                <div>
+                  <p className="text-sm text-gray-600">Condition</p>
+                  <p className="text-gray-900">{viewingProduct.condition}</p>
+                </div>
               </div>
               {viewingProduct.description && (
                 <div>

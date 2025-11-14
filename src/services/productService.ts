@@ -191,10 +191,55 @@ export const productService = {
     description: string;
     category: number;
     condition: string;
-    images?: { image: string; is_primary?: boolean; order?: number }[];
+    images?: File[];
   }): Promise<Product> => {
-    const response = await apiClient.post<Product>('/products/', productData);
+    const formData = new FormData();
+    formData.append('name', productData.name);
+    formData.append('description', productData.description);
+    formData.append('category', productData.category.toString());
+    formData.append('condition', productData.condition);
+    
+    // Append images if provided
+    if (productData.images && productData.images.length > 0) {
+      productData.images.forEach((imageFile) => {
+        formData.append('images', imageFile);
+      });
+    }
+    
+    const response = await apiClient.post<Product>('/products/', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
     return response.data;
+  },
+
+  /**
+   * Add image to an existing product
+   * POST /api/products/{id}/add_image/
+   */
+  addProductImage: async (productId: number, imageFile: File): Promise<any> => {
+    const formData = new FormData();
+    formData.append('image', imageFile);
+    
+    const response = await apiClient.post(
+      `/products/${productId}/add_image/`,
+      formData,
+      {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      }
+    );
+    return response.data;
+  },
+
+  /**
+   * Delete a product image
+   * DELETE /api/products/{productId}/delete_image/{imageId}/
+   */
+  deleteProductImage: async (productId: number, imageId: number): Promise<void> => {
+    await apiClient.delete(`/products/${productId}/delete_image/${imageId}/`);
   },
 
   /**
@@ -205,6 +250,10 @@ export const productService = {
     product_id: number;
     price: number;
     quantity: number;
+    featured?: boolean;
+    discount_percentage?: number;
+    discount_start_date?: string;
+    discount_end_date?: string;
   }): Promise<FixedPriceListing> => {
     const response = await apiClient.post<FixedPriceListing>('/listings/', listingData);
     return response.data;

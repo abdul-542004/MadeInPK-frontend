@@ -6,10 +6,20 @@ import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Textarea } from '../ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
-import { useAuction } from '../../contexts/AuctionContext';
+import { useSeller } from '../../contexts/SellerContext';
 import { Gavel, Clock, TrendingUp, Trash2, Upload, X } from 'lucide-react';
 import { Badge } from '../ui/badge';
 import { toast } from 'sonner';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "../ui/alert-dialog";
 
 // Categories data (matching backend category IDs)
 const categories = [
@@ -30,7 +40,7 @@ const conditions = [
 ];
 
 const SellerAuctions: React.FC = () => {
-  const { myAuctions, createAuction, deleteAuction } = useAuction();
+  const { auctions, addAuction, deleteAuction } = useSeller();
   
   const [formData, setFormData] = useState({
     productName: '',
@@ -41,21 +51,32 @@ const SellerAuctions: React.FC = () => {
     condition: 'new', // Default condition
   });
   
-  const [images, setImages] = useState<string[]>([]);
-  const [imageInput, setImageInput] = useState('');
+  const [imageFiles, setImageFiles] = useState<File[]>([]);
+  const [imagePreviews, setImagePreviews] = useState<string[]>([]);
+  const [deletingAuctionId, setDeletingAuctionId] = useState<number | null>(null);
 
-  const handleAddImage = () => {
-    if (imageInput.trim()) {
-      setImages([...images, imageInput.trim()]);
-      setImageInput('');
+  const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(event.target.files || []);
+    
+    if (imageFiles.length + files.length > 4) {
+      toast.error('Maximum 4 images allowed');
+      return;
     }
+
+    // Create preview URLs
+    const newPreviews = files.map(file => URL.createObjectURL(file));
+    setImageFiles([...imageFiles, ...files]);
+    setImagePreviews([...imagePreviews, ...newPreviews]);
   };
 
   const handleRemoveImage = (index: number) => {
-    setImages(images.filter((_, i) => i !== index));
+    // Revoke the object URL to prevent memory leaks
+    URL.revokeObjectURL(imagePreviews[index]);
+    setImageFiles(imageFiles.filter((_, i) => i !== index));
+    setImagePreviews(imagePreviews.filter((_, i) => i !== index));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!formData.productName || !formData.description || !formData.basePrice) {
@@ -63,31 +84,40 @@ const SellerAuctions: React.FC = () => {
       return;
     }
 
-    if (images.length === 0) {
+    if (imageFiles.length === 0) {
       toast.error('Please add at least one product image');
       return;
     }
 
-    createAuction({
-      productName: formData.productName,
-      description: formData.description,
-      images: images,
-      basePrice: parseFloat(formData.basePrice),
-      duration: formData.duration,
-      category: formData.category,
-      categoryId: parseInt(formData.category),
-    });
+    try {
+      await addAuction({
+        name: formData.productName,
+        description: formData.description,
+        images: imageFiles,
+        starting_price: parseFloat(formData.basePrice),
+        duration: formData.duration,
+        category: parseInt(formData.category),
+        condition: formData.condition,
+      });
 
-    // Reset form
-    setFormData({
-      productName: '',
-      description: '',
-      basePrice: '',
-      duration: '24 hours',
-      category: '1',
-      condition: 'new',
-    });
-    setImages([]);
+      // Reset form
+      setFormData({
+        productName: '',
+        description: '',
+        basePrice: '',
+        duration: '24 hours',
+        category: '1',
+        condition: 'new',
+      });
+      
+      // Clean up object URLs
+      imagePreviews.forEach(url => URL.revokeObjectURL(url));
+      setImageFiles([]);
+      setImagePreviews([]);
+    } catch (error) {
+      // Error already handled in context
+      console.error('Error creating auction:', error);
+    }
   };
 
   const formatTimeRemaining = (endTime: number) => {
@@ -123,7 +153,7 @@ const SellerAuctions: React.FC = () => {
         </TabsList>
 
         <TabsContent value="active" className="space-y-4 mt-6">
-          {myAuctions.length === 0 ? (
+          {auctions.length === 0 ? (
             <Card>
               <CardContent className="py-12 text-center">
                 <Gavel className="w-16 h-16 mx-auto text-gray-300 mb-4" />
@@ -132,7 +162,7 @@ const SellerAuctions: React.FC = () => {
             </Card>
           ) : (
             <div className="grid gap-4">
-              {myAuctions.map((auction) => (
+              {auctions.map((auction: any) => (
                 <Card key={auction.id} className="overflow-hidden">
                   <CardContent className="p-0">
                     <div className="flex flex-col md:flex-row">
@@ -158,7 +188,7 @@ const SellerAuctions: React.FC = () => {
                             <Button
                               variant="ghost"
                               size="sm"
-                              onClick={() => deleteAuction(auction.id)}
+                              onClick={() => setDeletingAuctionId(auction.id)}
                               className="text-red-600 hover:text-red-700 hover:bg-red-50"
                             >
                               <Trash2 className="w-4 h-4" />
@@ -278,23 +308,25 @@ const SellerAuctions: React.FC = () => {
 
                 <div className="space-y-2">
                   <Label>Product Images *</Label>
-                  <div className="flex gap-2">
-                    <Input
-                      placeholder="Enter image URL"
-                      value={imageInput}
-                      onChange={(e) => setImageInput(e.target.value)}
-                      onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddImage())}
+                  <label className="flex items-center justify-center gap-2 px-4 py-3 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-emerald-500 hover:bg-emerald-50 transition-colors">
+                    <Upload className="h-5 w-5 text-gray-500" />
+                    <span className="text-sm text-gray-600">
+                      {imageFiles.length === 0 ? 'Upload product images (max 4)' : `Add more images (${4 - imageFiles.length} remaining)`}
+                    </span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      onChange={handleImageUpload}
+                      className="hidden"
+                      disabled={imageFiles.length >= 4}
                     />
-                    <Button type="button" onClick={handleAddImage} className="bg-emerald-600 hover:bg-emerald-700">
-                      <Upload className="w-4 h-4 mr-2" />
-                      Add
-                    </Button>
-                  </div>
-                  {images.length > 0 && (
+                  </label>
+                  {imagePreviews.length > 0 && (
                     <div className="grid grid-cols-3 gap-3 mt-3">
-                      {images.map((img, index) => (
+                      {imagePreviews.map((preview, index) => (
                         <div key={index} className="relative group">
-                          <img src={img} alt={`Product ${index + 1}`} className="w-full h-24 object-cover rounded-lg border" />
+                          <img src={preview} alt={`Product ${index + 1}`} className="w-full h-24 object-cover rounded-lg border" />
                           <Button
                             type="button"
                             variant="destructive"
@@ -351,6 +383,36 @@ const SellerAuctions: React.FC = () => {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={!!deletingAuctionId} onOpenChange={() => setDeletingAuctionId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Auction</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this auction? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={async () => {
+                if (deletingAuctionId) {
+                  try {
+                    await deleteAuction(deletingAuctionId);
+                    setDeletingAuctionId(null);
+                  } catch (error) {
+                    console.error('Error deleting auction:', error);
+                  }
+                }
+              }}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
