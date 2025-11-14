@@ -12,9 +12,13 @@ interface CartPanelProps {
 }
 
 export function CartPanel({ open, onOpenChange, onViewCart, onCheckout }: CartPanelProps) {
-  const { cartItems, removeFromCart, getCartCount, getCartTotal } = useCart();
+  const { cartItems, removeFromCart, getCartCount, getCartTotal, loading } = useCart();
   const itemCount = getCartCount();
   const total = getCartTotal();
+
+  const handleRemove = async (productId: number) => {
+    await removeFromCart(productId);
+  };
 
   const handleContinueShopping = () => {
     onOpenChange(false);
@@ -81,9 +85,10 @@ export function CartPanel({ open, onOpenChange, onViewCart, onCheckout }: CartPa
 
                     {/* Remove Button */}
                     <button
-                      onClick={() => removeFromCart(item.product.id)}
+                      onClick={() => handleRemove(item.product.id)}
                       className="flex-shrink-0 text-gray-400 hover:text-red-500 transition-colors"
                       aria-label="Remove item"
+                      disabled={loading}
                     >
                       <Trash2 className="h-4 w-4" />
                     </button>

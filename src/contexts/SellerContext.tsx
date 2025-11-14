@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import { productService } from '../services/productService';
+import { messagingService, Conversation as ApiConversation, Message } from '../services/messagingService';
 import { MOCK_MODE } from '../lib/mockMode';
 import { toast } from 'sonner';
 
@@ -56,20 +57,20 @@ export interface SellerOrder {
   paymentMethod?: string;
 }
 
-export interface Message {
+export interface SellerMessage {
   sender: "customer" | "seller";
   text: string;
   time: string;
 }
 
-export interface Conversation {
+export interface SellerConversation {
   id: number;
   customer: string;
   lastMessage: string;
   time: string;
   unread: number;
   productImage: string;
-  messages: Message[];
+  messages: SellerMessage[];
 }
 
 export interface SellerNotification {
@@ -84,7 +85,7 @@ export interface SellerNotification {
 interface SellerContextType {
   products: SellerProduct[];
   orders: SellerOrder[];
-  conversations: Conversation[];
+  conversations: SellerConversation[];
   notifications: SellerNotification[];
   addProduct: (product: Omit<SellerProduct, "id" | "sales" | "createdAt" | "status" | "statusColor">) => Promise<void>;
   updateProduct: (id: string, updates: Partial<SellerProduct>) => void;
@@ -287,7 +288,7 @@ export function SellerProvider({ children }: { children: ReactNode }) {
     },
   ]);
 
-  const [conversations, setConversations] = useState<Conversation[]>([
+  const [conversations, setConversations] = useState<SellerConversation[]>([
     {
       id: 0,
       customer: "Ahmed Khan",
@@ -541,7 +542,7 @@ export function SellerProvider({ children }: { children: ReactNode }) {
   const sendMessage = (conversationId: number, messageText: string) => {
     setConversations(conversations.map((conv) => {
       if (conv.id === conversationId) {
-        const newMessage: Message = {
+        const newMessage: SellerMessage = {
           sender: "seller",
           text: messageText,
           time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),

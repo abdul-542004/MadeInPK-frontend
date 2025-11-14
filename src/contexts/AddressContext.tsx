@@ -73,10 +73,14 @@ export function AddressProvider({ children }: { children: ReactNode }) {
         setAddresses(mockAddresses);
       } else {
         const data = await addressService.getAddresses();
-        setAddresses(data);
+        // Ensure data is always an array
+        const addressArray = Array.isArray(data) ? data : [];
+        setAddresses(addressArray);
       }
     } catch (error) {
       console.error('Failed to load addresses:', error);
+      // Set empty array on error to prevent crashes
+      setAddresses([]);
       if (!MOCK_MODE) {
         toast.error('Failed to load addresses');
       }
@@ -255,6 +259,9 @@ export function AddressProvider({ children }: { children: ReactNode }) {
   };
 
   const getDefaultAddress = () => {
+    if (!Array.isArray(addresses) || addresses.length === 0) {
+      return undefined;
+    }
     return addresses.find((addr) => addr.is_default);
   };
 

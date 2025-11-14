@@ -8,8 +8,9 @@ import { Input } from './ui/input';
 import { Badge } from './ui/badge';
 import { Alert, AlertDescription } from './ui/alert';
 import { Progress } from './ui/progress';
-import { ArrowLeft, Gavel, Clock, TrendingUp, User, Trophy, AlertCircle, MapPin } from 'lucide-react';
+import { ArrowLeft, Gavel, Clock, TrendingUp, User, Trophy, AlertCircle, MapPin, MessageSquare } from 'lucide-react';
 import { toast } from 'sonner';
+import { BuyerMessageBox } from './BuyerMessageBox';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -37,6 +38,7 @@ const AuctionDetailPage: React.FC<AuctionDetailPageProps> = ({ auctionId: propAu
   const [bidAmount, setBidAmount] = useState('');
   const [selectedImage, setSelectedImage] = useState(0);
   const [showWinnerDialog, setShowWinnerDialog] = useState(false);
+  const [showMessageBox, setShowMessageBox] = useState(false);
   const [, setTick] = useState(0);
 
   // Update auction data and countdown timer every second
@@ -192,6 +194,26 @@ const AuctionDetailPage: React.FC<AuctionDetailPageProps> = ({ auctionId: propAu
                   <MapPin className="w-3 h-3" />
                   <span className="text-gray-900">{auction.product.region.name}</span>
                 </p>
+              )}
+              {/* Message Seller Button */}
+              {!isOwner && (
+                <div className="mt-3">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      if (user) {
+                        setShowMessageBox(!showMessageBox);
+                      } else {
+                        toast.error('Please login to message the seller');
+                      }
+                    }}
+                    className="text-emerald-700 border-emerald-300 hover:bg-emerald-50"
+                  >
+                    <MessageSquare className="w-4 h-4 mr-2" />
+                    Message Seller
+                  </Button>
+                </div>
               )}
             </div>
 
@@ -425,6 +447,18 @@ const AuctionDetailPage: React.FC<AuctionDetailPageProps> = ({ auctionId: propAu
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      
+      {/* Floating Message Box */}
+      {user && !isOwner && (
+        <BuyerMessageBox
+          sellerId={auction.product.seller}
+          sellerName={auction.product.seller_profile?.brand_name || auction.product.seller_username}
+          productName={auction.product.name}
+          productId={auction.product.id}
+          isOpen={showMessageBox}
+          onToggle={() => setShowMessageBox(!showMessageBox)}
+        />
+      )}
     </div>
   );
 };

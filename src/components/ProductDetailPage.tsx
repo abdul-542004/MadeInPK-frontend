@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
-import { Star, Heart, ArrowLeftRight, ShoppingCart, Minus, Plus, Truck, ArrowLeft, ChevronRight, Loader2, MapPin } from "lucide-react";
+import { Star, Heart, ArrowLeftRight, ShoppingCart, Minus, Plus, Truck, ArrowLeft, ChevronRight, Loader2, MapPin, MessageSquare } from "lucide-react";
 import { Button } from "./ui/button";
 import { Separator } from "./ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
@@ -11,6 +11,7 @@ import { ProductCard } from "./ProductCard";
 import { useWishlist } from "../contexts/WishlistContext";
 import { useCart } from "../contexts/CartContext";
 import { useAuth } from "../contexts/AuthContext";
+import { BuyerMessageBox } from "./BuyerMessageBox";
 import { productService } from "../services/productService";
 import { reviewService, ProductReview, CreateReviewRequest } from "../services/reviewService";
 import { MOCK_MODE } from "../lib/mockMode";
@@ -31,6 +32,7 @@ export function ProductDetailPage({ product: propProduct, listing: propListing, 
   const [loading, setLoading] = useState(!propProduct && !propListing);
   const [selectedImage, setSelectedImage] = useState(0);
   const [quantity, setQuantity] = useState(1);
+  const [showMessageBox, setShowMessageBox] = useState(false);
   const { toggleWishlist, isInWishlist } = useWishlist();
   const { addToCart } = useCart();
   const { user, isAuthenticated } = useAuth();
@@ -108,6 +110,18 @@ export function ProductDetailPage({ product: propProduct, listing: propListing, 
   const backendProduct = isBackendListing ? displayProduct as any : null;
   const productId = listing ? listing.id : product?.id || 0;
   const isWishlisted = isInWishlist(productId);
+  
+  // Get base product ID for messaging (from listing.product.id, not listing.id)
+  const baseProductId = listing ? listing.product.id : undefined;
+
+  // Get seller info
+  const sellerId = isBackendListing ? backendProduct?.seller : 1; // Default to 1 for mock
+  const sellerName = isBackendListing 
+    ? (backendProduct?.seller_profile?.brand_name || backendProduct?.seller_username)
+    : product?.artisan || 'Seller';
+  
+  // Check if current user is the owner
+  const isOwner = user?.id === sellerId;
 
   // Load reviews
   const loadReviews = async () => {
@@ -270,12 +284,38 @@ export function ProductDetailPage({ product: propProduct, listing: propListing, 
     }
   };
 
-  const handleAddToCart = () => {
-    if (product) {
-      addToCart(product, quantity);
+  const handleAddToCart = async () => {
+    if (!displayProduct) {
+      toast.info("Add to cart feature coming soon!");
+      return;
+    }
+
+    if (isBackendListing && listing) {
+      // For backend listings, pass the listing ID
+      const backendProduct = listing.product;
+      await addToCart(
+        {
+          id: backendProduct.id,
+          name: backendProduct.name,
+          price: backendCurrentPrice || 0,
+          image: backendProduct.images?.[0]?.image_url || '',
+          rating: 4.5,
+          artisan: backendProduct.seller_username || 'Unknown',
+          category: backendProduct.category_name || '',
+          description: backendProduct.description || '',
+          inStock: listing.quantity > 0,
+        } as Product,
+        quantity,
+        undefined,
+        listing.id
+      );
+      toast.success(`${quantity} x ${backendProduct.name} added to cart!`);
+    } else if (product) {
+      // For mock products, add without listing ID (will fail in non-mock mode)
+      await addToCart(product, quantity);
       toast.success(`${quantity} x ${displayProduct.name} added to cart!`);
     } else {
-      toast.info("Add to cart feature coming soon!");
+      toast.info("Cannot add to cart!");
     }
   };
 
@@ -432,7 +472,7 @@ export function ProductDetailPage({ product: propProduct, listing: propListing, 
 
                 {/* Price */}
                 <div className="mb-4">
-                  <div className="flex items-baseline gap-3">
+                  <div className="flex items-baseline gap-3 mb-2">
                     {!isBackendListing && product?.originalPrice && (
                       <span className="text-gray-400 line-through">
                         PKR {product.originalPrice.toLocaleString()}
@@ -440,13 +480,18 @@ export function ProductDetailPage({ product: propProduct, listing: propListing, 
                     )}
                     {isBackendListing && backendOriginalPrice && backendOriginalPrice > price && (
                       <span className="text-gray-400 line-through">
-                        PKR {backendOriginalPrice.toLocaleString()}
+                        PKR {Math.round(backendOriginalPrice).toLocaleString()}
                       </span>
                     )}
                   </div>
-                  <span className="text-emerald-700">
-                    PKR {price.toLocaleString()}
+                  <span className="text-3xl font-bold text-emerald-700">
+                    PKR {Math.round(price).toLocaleString()}
                   </span>
+                  {activeDiscountPercentage && (
+                    <p className="text-sm text-green-600 mt-2">
+                      Save {Math.round(activeDiscountPercentage)}% on this item!
+                    </p>
+                  )}
                 </div>
 
                 {/* Stock Availability */}
@@ -554,10 +599,21 @@ export function ProductDetailPage({ product: propProduct, listing: propListing, 
                       />
                       <span>{isWishlisted ? "Remove from Wishlist" : "Add to Wishlist"}</span>
                     </button>
-                    <button className="flex items-center gap-2 text-gray-700 hover:text-emerald-700 transition-colors">
-                      <ArrowLeftRight className="h-5 w-5" />
-                      <span>Add to Compare</span>
-                    </button>
+                    {!isOwner && (
+                      <button 
+                        onClick={() => {
+                          if (isAuthenticated) {
+                            setShowMessageBox(!showMessageBox);
+                          } else {
+                            toast.error('Please login to message the seller');
+                          }
+                        }}
+                        className="flex items-center gap-2 text-gray-700 hover:text-emerald-700 transition-colors"
+                      >
+                        <MessageSquare className="h-5 w-5" />
+                        <span>Message Seller</span>
+                      </button>
+                    )}
                   </div>
                 </div>
 
@@ -843,6 +899,18 @@ export function ProductDetailPage({ product: propProduct, listing: propListing, 
           )}
         </div>
       </div>
+
+      {/* Floating Message Box */}
+      {isAuthenticated && !isOwner && (
+        <BuyerMessageBox
+          sellerId={sellerId}
+          sellerName={sellerName}
+          productName={displayProduct.name}
+          productId={baseProductId}
+          isOpen={showMessageBox}
+          onToggle={() => setShowMessageBox(!showMessageBox)}
+        />
+      )}
     </div>
   );
 }

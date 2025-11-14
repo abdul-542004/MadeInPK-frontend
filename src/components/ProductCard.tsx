@@ -65,10 +65,37 @@ export function ProductCard({ product, listing, onProductClick, onListingClick }
     }
   };
 
-  const handleAddToCart = (e: React.MouseEvent) => {
+  const handleAddToCart = async (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (product) {
-      addToCart(product);
+    
+    if (!displayProduct) {
+      toast.info("Add to cart feature coming soon!");
+      return;
+    }
+
+    if (isBackendListing && listing) {
+      // For backend listings, pass the listing ID
+      const backendProd = listing.product;
+      await addToCart(
+        {
+          id: backendProd.id,
+          name: backendProd.name,
+          price: backendCurrentPrice || 0,
+          image: primaryImage?.image_url || '',
+          rating: 4.5,
+          artisan: backendProd.seller_username || 'Unknown',
+          category: backendProd.category_name || '',
+          description: backendProd.description || '',
+          inStock: listing.quantity > 0,
+        } as Product,
+        1,
+        undefined,
+        listing.id
+      );
+      toast.success(`${backendProd.name} added to cart!`);
+    } else if (product) {
+      // For mock products
+      await addToCart(product);
       toast.success(`${product.name} added to cart!`);
     } else {
       toast.info("Add to cart feature coming soon!");

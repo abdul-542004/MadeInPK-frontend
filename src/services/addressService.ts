@@ -82,8 +82,17 @@ export const addressService = {
    * GET /api/addresses/
    */
   getAddresses: async (): Promise<Address[]> => {
-    const response = await apiClient.get<Address[]>('/addresses/');
-    return response.data;
+    const response = await apiClient.get('/addresses/');
+    const data = response.data;
+    
+    // Handle both direct array and paginated response
+    if (Array.isArray(data)) {
+      return data as Address[];
+    }
+    if (data?.results && Array.isArray(data.results)) {
+      return data.results as Address[];
+    }
+    return [];
   },
 
   /**

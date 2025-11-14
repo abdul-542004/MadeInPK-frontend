@@ -16,10 +16,18 @@ interface CartPageProps {
 }
 
 export function CartPage({ onContinueShopping, onCheckout }: CartPageProps) {
-  const { cartItems, removeFromCart, updateQuantity, getCartTotal } = useCart();
+  const { cartItems, removeFromCart, updateQuantity, getCartTotal, loading } = useCart();
   const subtotal = getCartTotal();
   const shipping = 0; // Free shipping
   const total = subtotal + shipping;
+
+  const handleRemove = async (productId: number) => {
+    await removeFromCart(productId);
+  };
+
+  const handleQuantityChange = async (productId: number, newQuantity: number) => {
+    await updateQuantity(productId, newQuantity);
+  };
 
   if (cartItems.length === 0) {
     return (
@@ -113,7 +121,7 @@ export function CartPage({ onContinueShopping, onCheckout }: CartPageProps) {
                         </div>
 
                         {/* Size and Quantity */}
-                        <div className="flex flex-wrap items-center gap-4 mb-3">
+                          <div className="flex flex-wrap items-center gap-4 mb-3">
                           {item.size && (
                             <div className="flex items-center gap-2">
                               <span className="text-sm text-gray-600">Size:</span>
@@ -125,8 +133,9 @@ export function CartPage({ onContinueShopping, onCheckout }: CartPageProps) {
                             <Select
                               value={item.quantity.toString()}
                               onValueChange={(value) =>
-                                updateQuantity(item.product.id, parseInt(value))
+                                handleQuantityChange(item.product.id, parseInt(value))
                               }
+                              disabled={loading}
                             >
                               <SelectTrigger className="w-16 h-8">
                                 <SelectValue />
@@ -162,9 +171,10 @@ export function CartPage({ onContinueShopping, onCheckout }: CartPageProps) {
 
                       {/* Remove Button */}
                       <button
-                        onClick={() => removeFromCart(item.product.id)}
+                        onClick={() => handleRemove(item.product.id)}
                         className="flex-shrink-0 text-gray-400 hover:text-red-500 transition-colors h-fit"
                         aria-label="Remove item"
+                        disabled={loading}
                       >
                         <X className="h-5 w-5" />
                       </button>

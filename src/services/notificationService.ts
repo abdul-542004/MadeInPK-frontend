@@ -69,10 +69,10 @@ export const notificationService = {
 
   /**
    * Mark notification as read
-   * PATCH /api/notifications/{id}/mark_read/
+   * POST /api/notifications/{id}/mark_read/
    */
-  markAsRead: async (notificationId: number): Promise<Notification> => {
-    const response = await apiClient.patch<Notification>(
+  markAsRead: async (notificationId: number): Promise<{ message: string }> => {
+    const response = await apiClient.post<{ message: string }>(
       `/notifications/${notificationId}/mark_read/`
     );
     return response.data;

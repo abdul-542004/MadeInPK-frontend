@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { MapPin, Plus, ShoppingBag, CreditCard } from "lucide-react";
+import { MapPin, Plus, ShoppingBag } from "lucide-react";
 import { Button } from "./ui/button";
 import { useCart } from "../contexts/CartContext";
 import { useAddress } from "../contexts/AddressContext";
@@ -7,8 +7,8 @@ import { useAuth } from "../contexts/AuthContext";
 import { AddressPanel } from "./AddressPanel";
 import { ImageWithFallback } from "./figma/ImageWithFallback";
 import { toast } from "sonner";
-import { orderService } from "../services/orderService";
 import { MOCK_MODE } from "../lib/mockMode";
+import { useNavigate } from "react-router-dom";
 
 interface CheckoutPageProps {
   onBackToCart?: () => void;
@@ -16,11 +16,12 @@ interface CheckoutPageProps {
 }
 
 export function CheckoutPage({ onBackToCart, onOrderSuccess }: CheckoutPageProps) {
-  const { cartItems, getCartTotal, clearCart } = useCart();
+  const { cartItems, getCartTotal, checkout, loading } = useCart();
   const { addresses, getDefaultAddress } = useAddress();
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [isAddressPanelOpen, setIsAddressPanelOpen] = useState(false);
-  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<string | null>(null);
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<string>("stripe");
   const [isProcessing, setIsProcessing] = useState(false);
 
   const subtotal = getCartTotal();
@@ -31,54 +32,56 @@ export function CheckoutPage({ onBackToCart, onOrderSuccess }: CheckoutPageProps
       toast.error("Please add a delivery address");
       return;
     }
-    if (!selectedPaymentMethod) {
-      toast.error("Please select a payment method");
-      return;
-    }
+    
     if (!user) {
       toast.error("Please log in to place an order");
       return;
     }
 
+    if (cartItems.length === 0) {
+      toast.error("Your cart is empty");
+      return;
+    }
+
     if (MOCK_MODE) {
       // Mock mode - just navigate to success page
-      if (onOrderSuccess) {
-        clearCart();
-        onOrderSuccess();
+      setIsProcessing(true);
+      try {
+        const result = await checkout(defaultAddress.id);
+        if (result.success) {
+          toast.success("Order placed successfully!");
+          if (onOrderSuccess) {
+            onOrderSuccess();
+          }
+        } else {
+          toast.error(result.error || "Checkout failed");
+        }
+      } finally {
+        setIsProcessing(false);
       }
       return;
     }
 
-    // Backend mode - create actual order
+    // Backend mode - create actual order and redirect to payment
     setIsProcessing(true);
     try {
-      const orderData = {
-        items: cartItems.map(item => ({
-          listing_id: item.listingId || item.product.id,
-          quantity: item.quantity
-        })),
-        shipping_address: {
-          full_name: defaultAddress.full_name,
-          phone_number: defaultAddress.phone_number,
-          address_line1: defaultAddress.address_line1,
-          address_line2: defaultAddress.address_line2,
-          city: defaultAddress.city.toString(),
-          province: defaultAddress.province.toString(),
-          postal_code: defaultAddress.postal_code
-        },
-        payment_method: selectedPaymentMethod
-      };
-
-      await orderService.createOrder(orderData);
-      clearCart();
-      toast.success("Order placed successfully!");
+      const result = await checkout(defaultAddress.id);
       
-      if (onOrderSuccess) {
-        onOrderSuccess();
+      if (result.success && result.order) {
+        toast.success("Order created successfully!");
+        
+        // Redirect to Stripe payment URL
+        if (result.order.payment_url) {
+          window.location.href = result.order.payment_url;
+        } else if (onOrderSuccess) {
+          onOrderSuccess();
+        }
+      } else {
+        toast.error(result.error || "Checkout failed");
       }
     } catch (error: any) {
-      console.error('Error creating order:', error);
-      toast.error(error.response?.data?.message || 'Failed to place order');
+      console.error('Error during checkout:', error);
+      toast.error('Failed to place order');
     } finally {
       setIsProcessing(false);
     }
@@ -118,7 +121,7 @@ export function CheckoutPage({ onBackToCart, onOrderSuccess }: CheckoutPageProps
                     <div
                       key={address.id}
                       className={`p-4 border-2 rounded-lg ${
-                        address.isDefault
+                        address.is_default
                           ? "border-emerald-600 bg-emerald-50"
                           : "border-gray-200"
                       }`}
@@ -127,28 +130,31 @@ export function CheckoutPage({ onBackToCart, onOrderSuccess }: CheckoutPageProps
                         <div className="flex-1">
                           <div className="flex items-center gap-2 mb-2">
                             <span className="px-2 py-1 bg-gray-100 rounded text-xs text-gray-700 uppercase">
-                              {address.addressType}
+                              Home
                             </span>
-                            {address.isDefault && (
+                            {address.is_default && (
                               <span className="px-2 py-1 bg-emerald-600 text-white rounded text-xs">
                                 Default
                               </span>
                             )}
                           </div>
                           <p className="text-sm text-gray-900 mb-1">
-                            {address.addressLine1}
+                            {address.address_line1}
                           </p>
-                          <p className="text-sm text-gray-600">
-                            {address.city}, {address.state} - {address.pincode}
-                          </p>
-                          {address.landmark && (
+                          {address.address_line2 && (
                             <p className="text-sm text-gray-600">
-                              Landmark: {address.landmark}
+                              {address.address_line2}
                             </p>
                           )}
+                          <p className="text-sm text-gray-600">
+                            {address.city_name}, {address.province_name} - {address.postal_code}
+                          </p>
                           <p className="text-sm text-gray-600 mt-2">
                             <span className="text-lg mr-1">🇵🇰</span>
-                            {address.countryCode} {address.phoneNumber}
+                            {address.phone_number}
+                          </p>
+                          <p className="text-sm text-gray-900 mt-1">
+                            {address.full_name}
                           </p>
                         </div>
                       </div>
@@ -169,84 +175,32 @@ export function CheckoutPage({ onBackToCart, onOrderSuccess }: CheckoutPageProps
 
             {/* Payment Methods */}
             <div className="bg-white rounded-lg shadow-sm p-6">
-              <h2 className="text-xl text-gray-900 mb-6">Payment Methods</h2>
+              <h2 className="text-xl text-gray-900 mb-6">Payment Method</h2>
               <div className="space-y-3">
-                {/* Cash on Delivery */}
-                <button
-                  onClick={() => setSelectedPaymentMethod("cod")}
-                  className={`w-full p-4 border-2 rounded-lg text-left transition-all ${
-                    selectedPaymentMethod === "cod"
-                      ? "border-emerald-600 bg-emerald-50"
-                      : "border-gray-200 hover:border-gray-300"
-                  }`}
-                >
+                {/* Stripe Payment */}
+                <div className={`w-full p-4 border-2 rounded-lg ${
+                  selectedPaymentMethod === "stripe"
+                    ? "border-emerald-600 bg-emerald-50"
+                    : "border-gray-200"
+                }`}>
                   <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 bg-gray-800 rounded flex items-center justify-center">
-                      <ShoppingBag className="h-6 w-6 text-white" />
+                    <div className="w-12 h-12 bg-indigo-600 rounded flex items-center justify-center">
+                      <svg className="h-6 w-6 text-white" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M13.976 9.15c-2.172-.806-3.356-1.426-3.356-2.409 0-.831.683-1.305 1.901-1.305 2.227 0 4.515.858 6.09 1.631l.89-5.494C18.252.975 15.697 0 12.165 0 9.667 0 7.589.654 6.104 1.872 4.56 3.147 3.757 4.992 3.757 7.218c0 4.039 2.467 5.76 6.476 7.219 2.585.92 3.445 1.574 3.445 2.583 0 .98-.84 1.545-2.354 1.545-1.875 0-4.965-.921-6.99-2.109l-.9 5.555C5.175 22.99 8.385 24 11.714 24c2.641 0 4.843-.624 6.328-1.813 1.664-1.305 2.525-3.236 2.525-5.732 0-4.128-2.524-5.851-6.594-7.305h.003z"/>
+                      </svg>
                     </div>
-                    <span className="text-white bg-gray-800 px-3 py-2 rounded">
-                      CASH ON DELIVERY
-                    </span>
+                    <div>
+                      <span className="text-gray-900 font-medium">Stripe Payment</span>
+                      <p className="text-xs text-gray-500">Secure payment via Stripe</p>
+                    </div>
                   </div>
-                </button>
+                </div>
 
-                {/* PayPal */}
-                <button
-                  onClick={() => setSelectedPaymentMethod("paypal")}
-                  className={`w-full p-4 border-2 rounded-lg text-left transition-all ${
-                    selectedPaymentMethod === "paypal"
-                      ? "border-emerald-600 bg-emerald-50"
-                      : "border-gray-200 hover:border-gray-300"
-                  }`}
-                >
-                  <div className="flex items-center justify-center h-12 bg-yellow-400 rounded">
-                    <svg viewBox="0 0 100 32" className="h-6">
-                      <path
-                        fill="#003087"
-                        d="M12 4.917v18.42c0 1.5-1.2 2.73-2.69 2.73H4.69A2.72 2.72 0 0 1 2 23.337V4.917C2 3.417 3.2 2.187 4.69 2.187h4.62C10.8 2.187 12 3.417 12 4.917zm2.5 0c0-1.5 1.2-2.73 2.69-2.73h4.62c1.49 0 2.69 1.23 2.69 2.73v18.42c0 1.5-1.2 2.73-2.69 2.73h-4.62a2.72 2.72 0 0 1-2.69-2.73V4.917z"
-                      />
-                      <text
-                        x="28"
-                        y="20"
-                        fill="#003087"
-                        fontFamily="Arial"
-                        fontSize="16"
-                        fontWeight="bold"
-                      >
-                        PayPal
-                      </text>
-                    </svg>
-                  </div>
-                </button>
-
-                {/* Pay Later */}
-                <button
-                  onClick={() => setSelectedPaymentMethod("paylater")}
-                  className={`w-full p-4 border-2 rounded-lg text-left transition-all ${
-                    selectedPaymentMethod === "paylater"
-                      ? "border-emerald-600 bg-emerald-50"
-                      : "border-gray-200 hover:border-gray-300"
-                  }`}
-                >
-                  <div className="flex items-center justify-center h-12 bg-yellow-400 rounded">
-                    <svg viewBox="0 0 100 32" className="h-6">
-                      <path
-                        fill="#003087"
-                        d="M12 4.917v18.42c0 1.5-1.2 2.73-2.69 2.73H4.69A2.72 2.72 0 0 1 2 23.337V4.917C2 3.417 3.2 2.187 4.69 2.187h4.62C10.8 2.187 12 3.417 12 4.917zm2.5 0c0-1.5 1.2-2.73 2.69-2.73h4.62c1.49 0 2.69 1.23 2.69 2.73v18.42c0 1.5-1.2 2.73-2.69 2.73h-4.62a2.72 2.72 0 0 1-2.69-2.73V4.917z"
-                      />
-                      <text
-                        x="28"
-                        y="20"
-                        fill="#003087"
-                        fontFamily="Arial"
-                        fontSize="14"
-                        fontWeight="bold"
-                      >
-                        Pay Later
-                      </text>
-                    </svg>
-                  </div>
-                </button>
+                <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                  <p className="text-xs text-blue-800">
+                    💳 You will be redirected to Stripe to complete your payment securely.
+                  </p>
+                </div>
               </div>
             </div>
           </div>
@@ -306,11 +260,11 @@ export function CheckoutPage({ onBackToCart, onOrderSuccess }: CheckoutPageProps
               {/* Checkout Button */}
               <Button
                 onClick={handleCheckout}
-                disabled={!defaultAddress || !selectedPaymentMethod}
+                disabled={!defaultAddress || isProcessing || loading}
                 className="w-full mt-6 bg-red-500 hover:bg-red-600 text-white disabled:bg-gray-300 disabled:cursor-not-allowed"
               >
                 <ShoppingBag className="h-4 w-4 mr-2" />
-                CHECKOUT
+                {isProcessing || loading ? 'PROCESSING...' : 'PROCEED TO PAYMENT'}
               </Button>
 
               {onBackToCart && (

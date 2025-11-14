@@ -1,7 +1,6 @@
 import { Sheet, SheetContent, SheetTitle, SheetDescription } from "./ui/sheet";
 import { Button } from "./ui/button";
 import { ScrollArea } from "./ui/scroll-area";
-import { Separator } from "./ui/separator";
 import { Badge } from "./ui/badge";
 import { 
   Package, 
@@ -9,9 +8,7 @@ import {
   Truck, 
   AlertCircle, 
   CreditCard, 
-  X, 
-  CheckCheck,
-  Trash2 
+  CheckCheck
 } from "lucide-react";
 import { useNotifications } from "../contexts/NotificationContext";
 
@@ -25,31 +22,35 @@ export function NotificationPanel({ open, onOpenChange }: NotificationPanelProps
     notifications, 
     unreadCount, 
     markAsRead, 
-    markAllAsRead, 
-    deleteNotification, 
-    clearAll 
+    markAllAsRead
   } = useNotifications();
 
   const getIcon = (type: string) => {
     switch (type) {
-      case "order":
-        return <Package className="w-5 h-5 text-blue-600" />;
-      case "auction":
+      case "order_shipped":
+      case "order_delivered":
+        return <Truck className="w-5 h-5 text-blue-600" />;
+      case "bid_placed":
+      case "bid_outbid":
+      case "auction_won":
+      case "auction_lost":
+      case "auction_ended":
         return <Gavel className="w-5 h-5 text-emerald-600" />;
-      case "shipping":
-        return <Truck className="w-5 h-5 text-purple-600" />;
-      case "payment":
+      case "payment_reminder":
+      case "payment_received":
         return <CreditCard className="w-5 h-5 text-green-600" />;
-      case "system":
-        return <AlertCircle className="w-5 h-5 text-amber-600" />;
+      case "message_received":
+        return <Package className="w-5 h-5 text-purple-600" />;
+      case "account_blocked":
+      case "general":
       default:
         return <AlertCircle className="w-5 h-5 text-gray-600" />;
     }
   };
 
-  const getTimeAgo = (timestamp: number) => {
+  const getTimeAgo = (timestamp: string) => {
     const now = Date.now();
-    const diff = now - timestamp;
+    const diff = now - new Date(timestamp).getTime();
     
     const minutes = Math.floor(diff / 60000);
     const hours = Math.floor(diff / 3600000);
@@ -113,46 +114,37 @@ export function NotificationPanel({ open, onOpenChange }: NotificationPanelProps
                 <div
                   key={notification.id}
                   className={`p-4 hover:bg-gray-50 transition-colors ${
-                    !notification.read ? "bg-emerald-50/50" : ""
+                    !notification.is_read ? "bg-emerald-50/50" : ""
                   }`}
-                  onClick={() => !notification.read && markAsRead(notification.id)}
+                  onClick={async () => {
+                    console.log('Notification clicked:', notification.id, 'is_read:', notification.is_read);
+                    if (!notification.is_read) {
+                      console.log('Marking as read:', notification.id);
+                      await markAsRead(notification.id);
+                      console.log('Marked as read successfully');
+                    }
+                  }}
                 >
                   <div className="flex gap-3">
                     <div className="flex-shrink-0 mt-1">
-                      {getIcon(notification.type)}
+                      {getIcon(notification.notification_type)}
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-start justify-between gap-2 mb-1">
-                        <h4 className={`text-sm ${!notification.read ? "text-gray-900" : "text-gray-700"}`}>
+                        <h4 className={`text-sm ${!notification.is_read ? "text-gray-900" : "text-gray-700"}`}>
                           {notification.title}
                         </h4>
-                        {!notification.read && (
+                        {!notification.is_read && (
                           <Badge className="bg-emerald-600 h-2 w-2 p-0 rounded-full flex-shrink-0" />
                         )}
                       </div>
                       <p className="text-sm text-gray-600 mb-2 line-clamp-2">
                         {notification.message}
                       </p>
-                      {notification.metadata?.productName && (
-                        <p className="text-xs text-emerald-700 mb-2">
-                          {notification.metadata.productName}
-                        </p>
-                      )}
                       <div className="flex items-center justify-between">
                         <span className="text-xs text-gray-500">
-                          {getTimeAgo(notification.timestamp)}
+                          {getTimeAgo(notification.created_at)}
                         </span>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            deleteNotification(notification.id);
-                          }}
-                          className="h-7 w-7 p-0 text-gray-400 hover:text-red-600 hover:bg-red-50"
-                        >
-                          <X className="w-3 h-3" />
-                        </Button>
                       </div>
                     </div>
                   </div>
@@ -161,20 +153,6 @@ export function NotificationPanel({ open, onOpenChange }: NotificationPanelProps
             </div>
           )}
         </ScrollArea>
-
-        {/* Footer Actions */}
-        {notifications.length > 0 && (
-          <div className="border-t p-4 flex-shrink-0">
-            <Button
-              variant="outline"
-              className="w-full text-red-600 hover:text-red-700 hover:bg-red-50"
-              onClick={clearAll}
-            >
-              <Trash2 className="w-4 h-4 mr-2" />
-              Clear All Notifications
-            </Button>
-          </div>
-        )}
       </SheetContent>
     </Sheet>
   );
