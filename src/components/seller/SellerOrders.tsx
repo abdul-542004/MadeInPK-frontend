@@ -13,25 +13,43 @@ import {
   DialogHeader,
   DialogTitle,
 } from "../ui/dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "../ui/select";
-import { useSeller, SellerOrder } from "../../contexts/SellerContext";
-import { toast } from "sonner";
 import { sellerService } from "../../services/sellerService";
 import { MOCK_MODE } from "../../lib/mockMode";
+import { toast } from "sonner";
+
+interface BackendOrder {
+  id: number;
+  order_number: string;
+  buyer_username: string;
+  product_name: string | null;
+  order_type: 'auction' | 'fixed_price' | 'cart';
+  quantity: number | null;
+  total_amount: string;
+  seller_amount: string | null;
+  shipping_address_detail: {
+    street_address: string;
+    city_name: string;
+    province_name: string;
+    postal_code: string;
+  };
+  status: 'pending_payment' | 'payment_failed' | 'paid' | 'shipped' | 'delivered' | 'cancelled';
+  created_at: string;
+  paid_at: string | null;
+  shipped_at: string | null;
+  delivered_at: string | null;
+  items?: Array<{
+    product_name: string;
+    quantity: number;
+    unit_price: string;
+    subtotal: string;
+  }>;
+}
 
 export function SellerOrders() {
-  const { orders: contextOrders, updateOrderStatus } = useSeller();
-  const [orders, setOrders] = useState<SellerOrder[]>(contextOrders);
+  const [orders, setOrders] = useState<BackendOrder[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
-  const [viewingOrder, setViewingOrder] = useState<SellerOrder | null>(null);
-  const [updatingOrder, setUpdatingOrder] = useState<SellerOrder | null>(null);
-  const [newStatus, setNewStatus] = useState<SellerOrder["status"]>("Pending");
+  const [viewingOrder, setViewingOrder] = useState<BackendOrder | null>(null);
+  const [shippingOrderId, setShippingOrderId] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -40,59 +58,103 @@ export function SellerOrders() {
 
   const loadOrders = async () => {
     if (MOCK_MODE) {
-      // Use mock data from context
-      setOrders(contextOrders);
       setLoading(false);
       return;
     }
 
-    // Backend mode
     try {
       setLoading(true);
       const response = await sellerService.getSellerOrders();
-      // Map backend orders to SellerOrder format if needed
-      setOrders(response.results || response);
+      setOrders(response.results || []);
     } catch (error: any) {
       console.error('Error loading orders:', error);
-      toast.error(error.response?.data?.message || 'Failed to load orders');
-      // Fallback to context orders
-      setOrders(contextOrders);
+      toast.error(error.response?.data?.error || 'Failed to load orders');
     } finally {
       setLoading(false);
     }
   };
 
-  const filteredOrders = orders.filter((order) =>
-    order.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    order.customer.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    order.productName.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const handleMarkShipped = async () => {
+    if (!shippingOrderId) return;
 
-  const activeOrders = filteredOrders.filter((o) => 
-    !["Delivered", "Cancelled"].includes(o.status)
-  );
-  const pendingOrders = activeOrders.filter((o) => o.status === "Pending");
-  const processingOrders = activeOrders.filter((o) => o.status === "Processing");
-  const readyToShipOrders = activeOrders.filter((o) => o.status === "Ready to Ship");
-
-  const handleViewOrder = (order: SellerOrder) => {
-    setViewingOrder(order);
-  };
-
-  const handleUpdateStatus = (order: SellerOrder) => {
-    setUpdatingOrder(order);
-    setNewStatus(order.status);
-  };
-
-  const handleSaveStatus = () => {
-    if (updatingOrder) {
-      updateOrderStatus(updatingOrder.id, newStatus);
-      toast.success("Order status updated successfully!");
-      setUpdatingOrder(null);
+    try {
+      await sellerService.markOrderShipped(shippingOrderId);
+      toast.success("Order marked as shipped!");
+      setShippingOrderId(null);
+      loadOrders(); // Reload orders
+    } catch (error: any) {
+      console.error('Error marking order as shipped:', error);
+      toast.error(error.response?.data?.error || 'Failed to mark order as shipped');
     }
   };
 
-  const OrdersTable = ({ orders }: { orders: typeof filteredOrders }) => (
+  const getStatusColor = (status: BackendOrder['status']) => {
+    switch (status) {
+      case 'pending_payment':
+        return 'bg-gray-100 text-gray-700';
+      case 'payment_failed':
+        return 'bg-red-100 text-red-700';
+      case 'paid':
+        return 'bg-amber-100 text-amber-700';
+      case 'shipped':
+        return 'bg-blue-100 text-blue-700';
+      case 'delivered':
+        return 'bg-emerald-100 text-emerald-700';
+      case 'cancelled':
+        return 'bg-red-100 text-red-700';
+      default:
+        return 'bg-gray-100 text-gray-700';
+    }
+  };
+
+  const getStatusLabel = (status: BackendOrder['status']) => {
+    switch (status) {
+      case 'pending_payment':
+        return 'Pending Payment';
+      case 'payment_failed':
+        return 'Payment Failed';
+      case 'paid':
+        return 'Paid';
+      case 'shipped':
+        return 'Shipped';
+      case 'delivered':
+        return 'Delivered';
+      case 'cancelled':
+        return 'Cancelled';
+      default:
+        return status;
+    }
+  };
+
+  const formatDate = (dateString: string | null) => {
+    if (!dateString) return 'N/A';
+    return new Date(dateString).toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric'
+    });
+  };
+
+  const formatAmount = (amount: string | null) => {
+    if (!amount) return 'PKR 0';
+    return `PKR ${parseFloat(amount).toLocaleString()}`;
+  };
+
+  const filteredOrders = orders.filter((order) =>
+    order.order_number.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    order.buyer_username.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (order.product_name && order.product_name.toLowerCase().includes(searchQuery.toLowerCase()))
+  );
+
+  // Filter for active orders (not delivered or cancelled)
+  const activeOrders = filteredOrders.filter((o) => 
+    !["delivered", "cancelled"].includes(o.status)
+  );
+  const paidOrders = activeOrders.filter((o) => o.status === "paid");
+  const shippedOrders = activeOrders.filter((o) => o.status === "shipped");
+  const pendingOrders = activeOrders.filter((o) => o.status === "pending_payment");
+
+  const OrdersTable = ({ orders }: { orders: BackendOrder[] }) => (
     <div className="overflow-x-auto">
       <table className="w-full">
         <thead className="bg-gray-50 border-b border-gray-200">
@@ -127,25 +189,27 @@ export function SellerOrders() {
           {orders.map((order) => (
             <tr key={order.id} className="hover:bg-gray-50">
               <td className="px-6 py-4 whitespace-nowrap">
-                <span className="text-sm text-gray-900">{order.id}</span>
+                <span className="text-sm text-gray-900">{order.order_number}</span>
               </td>
               <td className="px-6 py-4 whitespace-nowrap">
-                <span className="text-sm text-gray-700">{order.customer}</span>
+                <span className="text-sm text-gray-700">{order.buyer_username}</span>
               </td>
               <td className="px-6 py-4">
-                <span className="text-sm text-gray-700">{order.productName}</span>
+                <span className="text-sm text-gray-700">
+                  {order.product_name || (order.items && order.items.length > 0 ? `${order.items.length} items` : 'N/A')}
+                </span>
               </td>
               <td className="px-6 py-4 whitespace-nowrap">
-                <span className="text-sm text-gray-700">{order.quantity}</span>
+                <span className="text-sm text-gray-700">{order.quantity || 'N/A'}</span>
               </td>
               <td className="px-6 py-4 whitespace-nowrap">
-                <span className="text-sm text-gray-900">{order.total}</span>
+                <span className="text-sm text-gray-900">{formatAmount(order.total_amount)}</span>
               </td>
               <td className="px-6 py-4 whitespace-nowrap">
-                <span className="text-sm text-gray-600">{order.date}</span>
+                <span className="text-sm text-gray-600">{formatDate(order.created_at)}</span>
               </td>
               <td className="px-6 py-4 whitespace-nowrap">
-                <Badge className={`${order.statusColor}`}>{order.status}</Badge>
+                <Badge className={getStatusColor(order.status)}>{getStatusLabel(order.status)}</Badge>
               </td>
               <td className="px-6 py-4 whitespace-nowrap">
                 <div className="flex gap-2">
@@ -153,18 +217,20 @@ export function SellerOrders() {
                     variant="ghost" 
                     size="sm" 
                     title="View Details"
-                    onClick={() => handleViewOrder(order)}
+                    onClick={() => setViewingOrder(order)}
                   >
                     <Eye className="h-4 w-4" />
                   </Button>
-                  <Button 
-                    variant="ghost" 
-                    size="sm" 
-                    title="Update Status"
-                    onClick={() => handleUpdateStatus(order)}
-                  >
-                    <Truck className="h-4 w-4" />
-                  </Button>
+                  {order.status === 'paid' && (
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      title="Mark as Shipped"
+                      onClick={() => setShippingOrderId(order.id)}
+                    >
+                      <Truck className="h-4 w-4" />
+                    </Button>
+                  )}
                 </div>
               </td>
             </tr>
@@ -180,6 +246,17 @@ export function SellerOrders() {
     </div>
   );
 
+  if (loading) {
+    return (
+      <div className="p-6 flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading orders...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="p-6 space-y-6">
       {/* Header */}
@@ -194,7 +271,7 @@ export function SellerOrders() {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600 mb-1">Pending</p>
+                <p className="text-sm text-gray-600 mb-1">Pending Payment</p>
                 <h3 className="text-gray-900">{pendingOrders.length}</h3>
               </div>
               <div className="bg-amber-50 p-3 rounded-lg">
@@ -208,8 +285,8 @@ export function SellerOrders() {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600 mb-1">Processing</p>
-                <h3 className="text-gray-900">{processingOrders.length}</h3>
+                <p className="text-sm text-gray-600 mb-1">Paid</p>
+                <h3 className="text-gray-900">{paidOrders.length}</h3>
               </div>
               <div className="bg-blue-50 p-3 rounded-lg">
                 <Package className="h-6 w-6 text-blue-600" />
@@ -222,8 +299,8 @@ export function SellerOrders() {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600 mb-1">Ready to Ship</p>
-                <h3 className="text-gray-900">{readyToShipOrders.length}</h3>
+                <p className="text-sm text-gray-600 mb-1">Shipped</p>
+                <h3 className="text-gray-900">{shippedOrders.length}</h3>
               </div>
               <div className="bg-emerald-50 p-3 rounded-lg">
                 <Truck className="h-6 w-6 text-emerald-600" />
@@ -258,9 +335,9 @@ export function SellerOrders() {
             <div className="border-b border-gray-200 px-6">
               <TabsList className="bg-transparent">
                 <TabsTrigger value="all">All ({activeOrders.length})</TabsTrigger>
-                <TabsTrigger value="pending">Pending ({pendingOrders.length})</TabsTrigger>
-                <TabsTrigger value="processing">Processing ({processingOrders.length})</TabsTrigger>
-                <TabsTrigger value="ready">Ready ({readyToShipOrders.length})</TabsTrigger>
+                <TabsTrigger value="pending">Pending Payment ({pendingOrders.length})</TabsTrigger>
+                <TabsTrigger value="paid">Paid ({paidOrders.length})</TabsTrigger>
+                <TabsTrigger value="shipped">Shipped ({shippedOrders.length})</TabsTrigger>
               </TabsList>
             </div>
             <TabsContent value="all">
@@ -269,11 +346,11 @@ export function SellerOrders() {
             <TabsContent value="pending">
               <OrdersTable orders={pendingOrders} />
             </TabsContent>
-            <TabsContent value="processing">
-              <OrdersTable orders={processingOrders} />
+            <TabsContent value="paid">
+              <OrdersTable orders={paidOrders} />
             </TabsContent>
-            <TabsContent value="ready">
-              <OrdersTable orders={readyToShipOrders} />
+            <TabsContent value="shipped">
+              <OrdersTable orders={shippedOrders} />
             </TabsContent>
           </Tabs>
         </CardContent>
@@ -285,7 +362,7 @@ export function SellerOrders() {
           <DialogHeader>
             <DialogTitle>Order Details</DialogTitle>
             <DialogDescription>
-              {viewingOrder?.id}
+              {viewingOrder?.order_number}
             </DialogDescription>
           </DialogHeader>
           {viewingOrder && (
@@ -293,91 +370,104 @@ export function SellerOrders() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <p className="text-sm text-gray-600">Customer Name</p>
-                  <p className="text-gray-900">{viewingOrder.customer}</p>
+                  <p className="text-gray-900">{viewingOrder.buyer_username}</p>
                 </div>
                 <div>
-                  <p className="text-sm text-gray-600">Customer Email</p>
-                  <p className="text-gray-900">{viewingOrder.customerEmail}</p>
+                  <p className="text-sm text-gray-600">Order Type</p>
+                  <p className="text-gray-900">{viewingOrder.order_type.replace('_', ' ').toUpperCase()}</p>
                 </div>
                 <div>
                   <p className="text-sm text-gray-600">Product</p>
-                  <p className="text-gray-900">{viewingOrder.productName}</p>
+                  <p className="text-gray-900">{viewingOrder.product_name || `${viewingOrder.items?.length || 0} items`}</p>
                 </div>
                 <div>
                   <p className="text-sm text-gray-600">Quantity</p>
-                  <p className="text-gray-900">{viewingOrder.quantity}</p>
+                  <p className="text-gray-900">{viewingOrder.quantity || 'N/A'}</p>
                 </div>
                 <div>
                   <p className="text-sm text-gray-600">Total Amount</p>
-                  <p className="text-gray-900">{viewingOrder.total}</p>
+                  <p className="text-gray-900">{formatAmount(viewingOrder.total_amount)}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-600">Your Earning</p>
+                  <p className="text-gray-900">{formatAmount(viewingOrder.seller_amount)}</p>
                 </div>
                 <div>
                   <p className="text-sm text-gray-600">Order Date</p>
-                  <p className="text-gray-900">{viewingOrder.date}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-gray-600">Payment Method</p>
-                  <p className="text-gray-900">{viewingOrder.paymentMethod}</p>
+                  <p className="text-gray-900">{formatDate(viewingOrder.created_at)}</p>
                 </div>
                 <div>
                   <p className="text-sm text-gray-600">Status</p>
-                  <Badge className={viewingOrder.statusColor}>{viewingOrder.status}</Badge>
+                  <Badge className={getStatusColor(viewingOrder.status)}>{getStatusLabel(viewingOrder.status)}</Badge>
                 </div>
               </div>
               <div>
                 <p className="text-sm text-gray-600 mb-1">Shipping Address</p>
-                <p className="text-gray-900">{viewingOrder.shippingAddress}</p>
+                <p className="text-gray-900">
+                  {viewingOrder.shipping_address_detail.street_address}, {viewingOrder.shipping_address_detail.city_name}, {viewingOrder.shipping_address_detail.province_name} {viewingOrder.shipping_address_detail.postal_code}
+                </p>
               </div>
+              {viewingOrder.items && viewingOrder.items.length > 0 && (
+                <div>
+                  <p className="text-sm text-gray-600 mb-2">Order Items</p>
+                  <div className="border rounded-lg overflow-hidden">
+                    <table className="w-full text-sm">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="px-4 py-2 text-left">Product</th>
+                          <th className="px-4 py-2 text-left">Quantity</th>
+                          <th className="px-4 py-2 text-left">Price</th>
+                          <th className="px-4 py-2 text-left">Subtotal</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y">
+                        {viewingOrder.items.map((item, index) => (
+                          <tr key={index}>
+                            <td className="px-4 py-2">{item.product_name}</td>
+                            <td className="px-4 py-2">{item.quantity}</td>
+                            <td className="px-4 py-2">{formatAmount(item.unit_price)}</td>
+                            <td className="px-4 py-2">{formatAmount(item.subtotal)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
             </div>
           )}
           <DialogFooter>
             <Button onClick={() => setViewingOrder(null)}>Close</Button>
-            {viewingOrder && (
+            {viewingOrder && viewingOrder.status === 'paid' && (
               <Button 
                 onClick={() => {
                   setViewingOrder(null);
-                  handleUpdateStatus(viewingOrder);
+                  setShippingOrderId(viewingOrder.id);
                 }}
                 className="bg-emerald-700 hover:bg-emerald-800"
               >
-                Update Status
+                Mark as Shipped
               </Button>
             )}
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Update Status Dialog */}
-      <Dialog open={!!updatingOrder} onOpenChange={() => setUpdatingOrder(null)}>
+      {/* Mark as Shipped Dialog */}
+      <Dialog open={!!shippingOrderId} onOpenChange={() => setShippingOrderId(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Update Order Status</DialogTitle>
+            <DialogTitle>Mark Order as Shipped</DialogTitle>
             <DialogDescription>
-              Change the status of order {updatingOrder?.id}
+              Are you sure you want to mark this order as shipped?
             </DialogDescription>
           </DialogHeader>
-          <div className="py-4">
-            <label className="text-sm text-gray-600 mb-2 block">Select New Status</label>
-            <Select value={newStatus} onValueChange={(value) => setNewStatus(value as SellerOrder["status"])}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="Pending">Pending</SelectItem>
-                <SelectItem value="Processing">Processing</SelectItem>
-                <SelectItem value="Ready to Ship">Ready to Ship</SelectItem>
-                <SelectItem value="Shipped">Shipped</SelectItem>
-                <SelectItem value="Delivered">Delivered</SelectItem>
-                <SelectItem value="Cancelled">Cancelled</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setUpdatingOrder(null)}>
+            <Button variant="outline" onClick={() => setShippingOrderId(null)}>
               Cancel
             </Button>
-            <Button onClick={handleSaveStatus} className="bg-emerald-700 hover:bg-emerald-800">
-              Update Status
+            <Button onClick={handleMarkShipped} className="bg-emerald-700 hover:bg-emerald-800">
+              Confirm
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Sheet, SheetContent, SheetTitle, SheetDescription } from "./ui/sheet";
 import { Avatar, AvatarFallback } from "./ui/avatar";
 import { Button } from "./ui/button";
@@ -9,6 +9,9 @@ import { User, MapPin, Heart, Package, LogOut, Mail, Phone, Store } from "lucide
 import { useAuth } from "../contexts/AuthContext";
 import { toast } from "sonner";
 import { SellerRegistrationForm, SellerData } from "./SellerRegistrationForm";
+import { orderService, Order } from "../services/orderService";
+import { authService } from "../services/authService";
+import { MOCK_MODE } from "../lib/mockMode";
 
 interface MyAccountPanelProps {
   open: boolean;
@@ -27,17 +30,105 @@ export function MyAccountPanel({
   onOpenAddressPanel,
   onOpenSellerDashboard
 }: MyAccountPanelProps) {
-  const { user, logout, updateProfile, isSeller, becomeSeller } = useAuth();
+  const { user, logout, updateProfile, isSeller, isBuyer, becomeSeller } = useAuth();
   const [currentView, setCurrentView] = useState<AccountView>("menu");
   const [editMode, setEditMode] = useState(false);
-  const [firstName, setFirstName] = useState(user?.first_name || "");
-  const [lastName, setLastName] = useState(user?.last_name || "");
-  const [email, setEmail] = useState(user?.email || "");
-  const [phone, setPhone] = useState(user?.phone_number || "");
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
   const [showSellerRegistration, setShowSellerRegistration] = useState(false);
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [loadingOrders, setLoadingOrders] = useState(false);
 
-  // Mock orders data
-  const orders = [
+  // Update form fields when user changes
+  useEffect(() => {
+    if (user) {
+      setFirstName(user.first_name || "");
+      setLastName(user.last_name || "");
+      setEmail(user.email || "");
+      setPhone(user.phone_number || "");
+    }
+  }, [user]);
+
+  useEffect(() => {
+    if (currentView === 'orders' && !MOCK_MODE) {
+      console.log('Loading orders for user:', user?.username, 'role:', user?.role);
+      loadOrders();
+    }
+  }, [currentView]);
+
+  const loadOrders = async () => {
+    try {
+      setLoadingOrders(true);
+      const orderData = await orderService.getBuyerOrders({ ordering: '-created_at' });
+      setOrders(orderData);
+    } catch (error: any) {
+      console.error('Error loading orders:', error);
+      toast.error(error.response?.data?.error || 'Failed to load orders');
+    } finally {
+      setLoadingOrders(false);
+    }
+  };
+
+  const getStatusColor = (status: Order['status']) => {
+    switch (status) {
+      case 'delivered':
+        return 'text-emerald-700 bg-emerald-50';
+      case 'shipped':
+        return 'text-blue-700 bg-blue-50';
+      case 'paid':
+        return 'text-purple-700 bg-purple-50';
+      case 'pending_payment':
+        return 'text-amber-700 bg-amber-50';
+      case 'payment_failed':
+      case 'cancelled':
+        return 'text-red-700 bg-red-50';
+      default:
+        return 'text-gray-700 bg-gray-50';
+    }
+  };
+
+  const getStatusLabel = (status: Order['status']) => {
+    switch (status) {
+      case 'pending_payment':
+        return 'Pending Payment';
+      case 'payment_failed':
+        return 'Payment Failed';
+      case 'paid':
+        return 'Processing';
+      case 'shipped':
+        return 'In Transit';
+      case 'delivered':
+        return 'Delivered';
+      case 'cancelled':
+        return 'Cancelled';
+      default:
+        return status;
+    }
+  };
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric'
+    });
+  };
+
+  const formatAmount = (amount: string) => {
+    return `PKR ${parseFloat(amount).toLocaleString()}`;
+  };
+
+  const getItemCount = (order: Order) => {
+    if (order.items && order.items.length > 0) {
+      return order.items.reduce((sum, item) => sum + item.quantity, 0);
+    }
+    return order.quantity || 1;
+  };
+
+  // Mock orders data for MOCK_MODE
+  const mockOrders = [
     {
       id: "ORD-2025-001",
       date: "Oct 15, 2025",
@@ -64,15 +155,20 @@ export function MyAccountPanel({
     }
   ];
 
-  const handleSaveProfile = () => {
-    updateProfile({ 
-      first_name: firstName, 
-      last_name: lastName, 
-      email, 
-      phone_number: phone 
-    });
-    setEditMode(false);
-    toast.success("Profile updated successfully!");
+  const handleSaveProfile = async () => {
+    try {
+      await updateProfile({ 
+        first_name: firstName, 
+        last_name: lastName, 
+        email, 
+        phone_number: phone 
+      });
+      setEditMode(false);
+      toast.success("Profile updated successfully!");
+    } catch (error: any) {
+      console.error('Failed to update profile:', error);
+      toast.error(error.response?.data?.message || 'Failed to update profile');
+    }
   };
 
   const handleLogout = () => {
@@ -87,7 +183,6 @@ export function MyAccountPanel({
   };
 
   const handleAddressClick = () => {
-    onOpenChange(false);
     onOpenAddressPanel?.();
   };
 
@@ -100,13 +195,40 @@ export function MyAccountPanel({
     }
   };
 
-  const handleSellerRegistrationComplete = (sellerData: SellerData) => {
-    becomeSeller(sellerData);
-    toast.success("Congratulations! You are now a seller. Opening your dashboard...");
-    setTimeout(() => {
-      onOpenChange(false);
-      onOpenSellerDashboard?.();
-    }, 1000);
+  const handleSellerRegistrationComplete = async (sellerData: SellerData) => {
+    try {
+      if (MOCK_MODE) {
+        becomeSeller(sellerData);
+        toast.success("Congratulations! You are now a seller. Opening your dashboard...");
+        setTimeout(() => {
+          onOpenChange(false);
+          onOpenSellerDashboard?.();
+        }, 1000);
+      } else {
+        // Call backend API to become a seller
+        const response = await authService.becomeSeller({
+          brand_name: sellerData.businessName,
+          biography: sellerData.businessDescription,
+          business_address_id: sellerData.businessAddressId || undefined,
+          business_phone: sellerData.businessPhone,
+          website: '',
+          social_media_links: {}
+        });
+        
+        // Update user in context
+        updateProfile(response.user);
+        
+        toast.success("Congratulations! You are now a seller. Opening your dashboard...");
+        setTimeout(() => {
+          setShowSellerRegistration(false);
+          onOpenChange(false);
+          onOpenSellerDashboard?.();
+        }, 1000);
+      }
+    } catch (error: any) {
+      console.error('Failed to become seller:', error);
+      toast.error(error.response?.data?.message || error.response?.data?.error || 'Failed to register as seller');
+    }
   };
 
   const getInitials = (firstName?: string, lastName?: string) => {
@@ -163,13 +285,16 @@ export function MyAccountPanel({
           <span className="text-gray-700">My List</span>
         </button>
 
-        <button
-          onClick={() => setCurrentView("orders")}
-          className="w-full flex items-center gap-3 px-6 py-3 hover:bg-emerald-50 transition-colors text-left"
-        >
-          <Package className="h-5 w-5 text-gray-600" />
-          <span className="text-gray-700">My Orders</span>
-        </button>
+        {/* Only show My Orders for buyers (role='buyer' or role='both') */}
+        {isBuyer && (
+          <button
+            onClick={() => setCurrentView("orders")}
+            className="w-full flex items-center gap-3 px-6 py-3 hover:bg-emerald-50 transition-colors text-left"
+          >
+            <Package className="h-5 w-5 text-gray-600" />
+            <span className="text-gray-700">My Orders</span>
+          </button>
+        )}
 
         <Separator className="my-2" />
 
@@ -313,7 +438,10 @@ export function MyAccountPanel({
     </div>
   );
 
-  const renderOrders = () => (
+  const renderOrders = () => {
+    const displayOrders = MOCK_MODE ? mockOrders : orders;
+    
+    return (
     <div className="flex flex-col h-full">
       {/* Header */}
       <div className="flex items-center py-4 border-b px-6">
@@ -328,33 +456,78 @@ export function MyAccountPanel({
 
       {/* Orders List */}
       <div className="flex-1 overflow-y-auto p-6">
-        <div className="space-y-4">
-          {orders.map((order) => (
-            <div
-              key={order.id}
-              className="border rounded-lg p-4 hover:border-emerald-500 transition-colors cursor-pointer"
-            >
-              <div className="flex justify-between items-start mb-3">
-                <div>
-                  <p className="text-gray-900">{order.id}</p>
-                  <p className="text-sm text-gray-600 mt-1">{order.date}</p>
+        {loadingOrders ? (
+          <div className="text-center py-12">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-600 mx-auto mb-4"></div>
+            <p className="text-gray-600">Loading orders...</p>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {MOCK_MODE ? (
+              mockOrders.map((order) => (
+                <div
+                  key={order.id}
+                  className="border rounded-lg p-4 hover:border-emerald-500 transition-colors cursor-pointer"
+                >
+                  <div className="flex justify-between items-start mb-3">
+                    <div>
+                      <p className="text-gray-900 font-medium">{order.id}</p>
+                      <p className="text-sm text-gray-600 mt-1">{order.date}</p>
+                    </div>
+                    <span className={`px-3 py-1 rounded-full text-xs ${order.statusColor}`}>
+                      {order.status}
+                    </span>
+                  </div>
+                  <Separator className="my-3" />
+                  <div className="flex justify-between items-center">
+                    <p className="text-sm text-gray-600">
+                      {order.items} {order.items === 1 ? 'item' : 'items'}
+                    </p>
+                    <p className="text-gray-900 font-medium">{order.total}</p>
+                  </div>
                 </div>
-                <span className={`px-3 py-1 rounded-full text-xs ${order.statusColor}`}>
-                  {order.status}
-                </span>
-              </div>
-              <Separator className="my-3" />
-              <div className="flex justify-between items-center">
-                <p className="text-sm text-gray-600">
-                  {order.items} {order.items === 1 ? 'item' : 'items'}
-                </p>
-                <p className="text-gray-900">{order.total}</p>
-              </div>
-            </div>
-          ))}
-        </div>
+              ))
+            ) : (
+              orders.map((order) => (
+                <div
+                  key={order.id}
+                  className="border rounded-lg p-4 hover:border-emerald-500 transition-colors cursor-pointer"
+                >
+                  <div className="flex justify-between items-start mb-3">
+                    <div>
+                      <p className="text-gray-900 font-medium">{order.order_number}</p>
+                      <p className="text-sm text-gray-600 mt-1">{formatDate(order.created_at)}</p>
+                    </div>
+                    <span className={`px-3 py-1 rounded-full text-xs ${getStatusColor(order.status)}`}>
+                      {getStatusLabel(order.status)}
+                    </span>
+                  </div>
+                  <Separator className="my-3" />
+                  <div className="flex justify-between items-center">
+                    <p className="text-sm text-gray-600">
+                      {getItemCount(order)} {getItemCount(order) === 1 ? 'item' : 'items'}
+                    </p>
+                    <p className="text-gray-900 font-medium">{formatAmount(order.total_amount)}</p>
+                  </div>
+                  {order.payment_url && order.status === 'pending_payment' && (
+                    <div className="mt-3 pt-3 border-t">
+                      <a
+                        href={order.payment_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-sm text-emerald-700 hover:text-emerald-800 font-medium"
+                      >
+                        Complete Payment →
+                      </a>
+                    </div>
+                  )}
+                </div>
+              ))
+            )}
+          </div>
+        )}
 
-        {orders.length === 0 && (
+        {!loadingOrders && displayOrders.length === 0 && (
           <div className="text-center py-12">
             <Package className="h-16 w-16 text-gray-300 mx-auto mb-4" />
             <p className="text-gray-600">No orders yet</p>
@@ -372,6 +545,7 @@ export function MyAccountPanel({
       </div>
     </div>
   );
+  };
 
   const renderContent = () => {
     switch (currentView) {

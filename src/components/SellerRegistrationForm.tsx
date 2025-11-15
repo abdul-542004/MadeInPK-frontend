@@ -1,11 +1,12 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "./ui/dialog";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { Textarea } from "./ui/textarea";
-import { Store, Phone, MapPin, Building2, CreditCard } from "lucide-react";
+import { Store, Phone, MapPin, Building2, Plus } from "lucide-react";
 import { toast } from "sonner";
+import { useAddress } from "../contexts/AddressContext";
 
 interface SellerRegistrationFormProps {
   open: boolean;
@@ -16,29 +17,32 @@ interface SellerRegistrationFormProps {
 export interface SellerData {
   businessName: string;
   businessPhone: string;
-  businessAddress: string;
+  businessAddressId: number | null;  // Changed from businessAddress string
   businessDescription: string;
-  bankAccountName?: string;
-  bankAccountNumber?: string;
-  bankName?: string;
 }
 
 export function SellerRegistrationForm({ open, onOpenChange, onComplete }: SellerRegistrationFormProps) {
+  const { addresses, loadProvinces, refreshAddresses } = useAddress();
   const [formData, setFormData] = useState<SellerData>({
     businessName: "",
     businessPhone: "",
-    businessAddress: "",
+    businessAddressId: null,
     businessDescription: "",
-    bankAccountName: "",
-    bankAccountNumber: "",
-    bankName: "",
   });
+  const [showAddressNote, setShowAddressNote] = useState(false);
+
+  useEffect(() => {
+    if (open) {
+      refreshAddresses();
+      loadProvinces();
+    }
+  }, [open]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
     // Validate required fields
-    if (!formData.businessName || !formData.businessPhone || !formData.businessAddress || !formData.businessDescription) {
+    if (!formData.businessName || !formData.businessPhone || !formData.businessAddressId || !formData.businessDescription) {
       toast.error("Please fill all required fields");
       return;
     }
@@ -51,19 +55,14 @@ export function SellerRegistrationForm({ open, onOpenChange, onComplete }: Selle
     }
 
     onComplete(formData);
-    toast.success("Seller registration successful!");
-    onOpenChange(false);
   };
 
   const handleCancel = () => {
     setFormData({
       businessName: "",
       businessPhone: "",
-      businessAddress: "",
+      businessAddressId: null,
       businessDescription: "",
-      bankAccountName: "",
-      bankAccountNumber: "",
-      bankName: "",
     });
     onOpenChange(false);
   };
@@ -127,17 +126,28 @@ export function SellerRegistrationForm({ open, onOpenChange, onComplete }: Selle
               <Label htmlFor="businessAddress" className="text-gray-700">
                 Business Address <span className="text-red-500">*</span>
               </Label>
-              <div className="relative">
-                <MapPin className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                <Input
-                  id="businessAddress"
-                  placeholder="Complete address with city"
-                  value={formData.businessAddress}
-                  onChange={(e) => setFormData({ ...formData, businessAddress: e.target.value })}
-                  className="pl-10"
-                  required
-                />
-              </div>
+              <select
+                id="businessAddress"
+                value={formData.businessAddressId || ""}
+                onChange={(e) => setFormData({ ...formData, businessAddressId: e.target.value ? Number(e.target.value) : null })}
+                className="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-emerald-500"
+                required
+              >
+                <option value="">Select your business address</option>
+                {addresses.map((addr) => (
+                  <option key={addr.id} value={addr.id}>
+                    {addr.street_address}, {addr.city_name}, {addr.province_name}
+                  </option>
+                ))}
+              </select>
+              {addresses.length === 0 && (
+                <p className="text-xs text-amber-600">
+                  No addresses found. Please add an address from your account settings first.
+                </p>
+              )}
+              <p className="text-xs text-gray-500">
+                Select the address where your business is located. This helps buyers find products from their region.
+              </p>
             </div>
 
             <div className="space-y-2">
@@ -158,49 +168,8 @@ export function SellerRegistrationForm({ open, onOpenChange, onComplete }: Selle
             </div>
           </div>
 
-          {/* Bank Details (Optional) */}
-          <div className="space-y-4 pt-4 border-t">
-            <div className="flex items-center gap-2 text-gray-700">
-              <CreditCard className="w-5 h-5" />
-              <h3 className="text-gray-800">Bank Details (Optional)</h3>
-            </div>
-            <p className="text-sm text-gray-500">
-              Add your bank details to receive payments directly
-            </p>
-
-            <div className="space-y-2">
-              <Label htmlFor="bankAccountName" className="text-gray-700">Account Holder Name</Label>
-              <Input
-                id="bankAccountName"
-                placeholder="e.g., Muhammad Ali"
-                value={formData.bankAccountName}
-                onChange={(e) => setFormData({ ...formData, bankAccountName: e.target.value })}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="bankAccountNumber" className="text-gray-700">Account Number</Label>
-              <Input
-                id="bankAccountNumber"
-                placeholder="e.g., 1234567890123456"
-                value={formData.bankAccountNumber}
-                onChange={(e) => setFormData({ ...formData, bankAccountNumber: e.target.value })}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="bankName" className="text-gray-700">Bank Name</Label>
-              <Input
-                id="bankName"
-                placeholder="e.g., HBL, UBL, MCB"
-                value={formData.bankName}
-                onChange={(e) => setFormData({ ...formData, bankName: e.target.value })}
-              />
-            </div>
-          </div>
-
           {/* Action Buttons */}
-          <div className="flex gap-3 pt-4">
+          <div className="flex gap-3 pt-6">
             <Button
               type="submit"
               className="flex-1 bg-emerald-700 hover:bg-emerald-800"

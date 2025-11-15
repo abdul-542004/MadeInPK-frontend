@@ -18,25 +18,17 @@ export interface City {
 export interface Address {
   id: number;
   user: number;
-  full_name: string;
-  phone_number: string;
-  address_line1: string;
-  address_line2?: string;
+  street_address: string;
   city: number;
   city_name: string;
-  province: number;
   province_name: string;
   postal_code: string;
   is_default: boolean;
   created_at: string;
-  updated_at: string;
 }
 
 export interface CreateAddressRequest {
-  full_name: string;
-  phone_number: string;
-  address_line1: string;
-  address_line2?: string;
+  street_address: string;
   city: number;
   postal_code: string;
   is_default?: boolean;
@@ -73,8 +65,17 @@ export const addressService = {
     const url = provinceId 
       ? `/cities/?province=${provinceId}` 
       : '/cities/';
-    const response = await apiClient.get<City[]>(url);
-    return response.data;
+    const response = await apiClient.get(url);
+    const data = response.data;
+    
+    // Handle both direct array and paginated response
+    if (Array.isArray(data)) {
+      return data as City[];
+    }
+    if (data?.results && Array.isArray(data.results)) {
+      return data.results as City[];
+    }
+    return [];
   },
 
   /**
@@ -129,10 +130,10 @@ export const addressService = {
 
   /**
    * Set address as default
-   * PATCH /api/addresses/{id}/set_default/
+   * POST /api/addresses/{id}/set_default/
    */
-  setDefaultAddress: async (addressId: number): Promise<Address> => {
-    const response = await apiClient.patch<Address>(
+  setDefaultAddress: async (addressId: number): Promise<{ message: string }> => {
+    const response = await apiClient.post<{ message: string }>(
       `/addresses/${addressId}/set_default/`
     );
     return response.data;

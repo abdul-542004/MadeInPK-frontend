@@ -85,6 +85,7 @@ interface SellerContextType {
     discount_start_date?: string | null;
     discount_end_date?: string | null;
   }) => Promise<void>;
+  toggleProductStatus: (listingId: number) => Promise<void>;
   deleteProduct: (productId: number) => Promise<void>;
   
   // Auction management
@@ -404,6 +405,29 @@ export function SellerProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  // Toggle product status
+  const toggleProductStatus = async (listingId: number) => {
+    if (MOCK_MODE) {
+      setProducts(prev => prev.map(p => 
+        p.listingId === listingId 
+          ? { ...p, status: p.status === 'active' ? 'inactive' : 'active' }
+          : p
+      ));
+      toast.success('Product status updated!');
+      return;
+    }
+
+    try {
+      const result = await sellerService.toggleListingStatus(listingId);
+      toast.success(result.message);
+      await loadProducts();
+    } catch (error: any) {
+      console.error('Error toggling product status:', error);
+      toast.error(error.response?.data?.error || 'Failed to update product status');
+      throw error;
+    }
+  };
+
   // Delete product
   const deleteProduct = async (productId: number) => {
     if (MOCK_MODE) {
@@ -663,6 +687,7 @@ export function SellerProvider({ children }: { children: ReactNode }) {
         loadProducts,
         addProduct,
         updateProduct,
+        toggleProductStatus,
         deleteProduct,
         loadAuctions,
         addAuction,

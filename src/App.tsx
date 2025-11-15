@@ -31,6 +31,7 @@ import { Footer } from "./components/Footer";
 import { CartPanel } from "./components/CartPanel";
 import { MyAccountPanel } from "./components/MyAccountPanel";
 import { AddressPanel } from "./components/AddressPanel";
+import { ManageAddressesPanel } from "./components/ManageAddressesPanel";
 import { NotificationPanel } from "./components/NotificationPanel";
 
 // Main App wrapper with Router
@@ -249,7 +250,7 @@ function AppContent() {
         onOpenSellerDashboard={() => navigate("/seller-dashboard")}
       />
 
-      <AddressPanel
+      <ManageAddressesPanel
         open={isAddressPanelOpen}
         onOpenChange={setIsAddressPanelOpen}
       />

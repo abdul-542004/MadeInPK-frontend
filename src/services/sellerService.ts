@@ -9,14 +9,35 @@ import { SellerProfile } from '../types/auth';
 export interface CreateSellerProfileRequest {
   brand_name: string;
   biography: string;
-  business_address: string;
+  business_address?: string;  // Legacy text field
+  business_address_id?: number | null;  // New address ID
+  business_phone?: string;
   website?: string;
   social_media_links?: Record<string, string>;
 }
 
-export interface UpdateSellerProfileRequest extends Partial<CreateSellerProfileRequest> {}
+export interface UpdateSellerProfileRequest extends Partial<CreateSellerProfileRequest> {
+  business_phone?: string;
+}
 
 export const sellerService = {
+  /**
+   * Get current user's seller profile
+   * GET /api/seller-profiles/
+   */
+  getMySellerProfile: async (): Promise<SellerProfile> => {
+    const response = await apiClient.get('/seller-profiles/');
+    // Returns array of seller profiles for current user
+    const data = response.data;
+    if (Array.isArray(data) && data.length > 0) {
+      return data[0];
+    }
+    if (data?.results && Array.isArray(data.results) && data.results.length > 0) {
+      return data.results[0];
+    }
+    throw new Error('Seller profile not found');
+  },
+
   /**
    * Get seller profile by ID
    * @param id - Seller profile ID
@@ -82,29 +103,63 @@ export const sellerService = {
    * Get seller earnings breakdown
    * GET /api/seller/earnings/
    */
-  getSellerEarnings: async (filters?: {
-    start_date?: string;
-    end_date?: string;
-    status?: string;
-  }): Promise<{
+  getSellerEarnings: async (): Promise<{
+    current_month: string;
+    last_month: string;
     total_earnings: string;
-    pending_earnings: string;
-    completed_earnings: string;
-    earnings_by_month: Array<{ month: string; amount: string }>;
+    pending_payouts: string;
+    earnings_by_month: Array<{ month: string; amount: string; earnings: number }>;
+    earnings_by_week: Array<{ name: string; amount: string; earnings: number }>;
+    earnings_by_quarter: Array<{ name: string; amount: string; earnings: number }>;
+    earnings_by_year: Array<{ name: string; amount: string; earnings: number }>;
   }> => {
-    const params = new URLSearchParams();
-    
-    if (filters) {
-      Object.entries(filters).forEach(([key, value]) => {
-        if (value !== undefined && value !== null) {
-          params.append(key, value.toString());
-        }
-      });
-    }
+    const response = await apiClient.get('/seller/earnings/');
+    return response.data;
+  },
+
+  /**
+   * Get seller transaction history
+   * GET /api/seller/transactions/
+   */
+  getSellerTransactions: async (params?: {
+    limit?: number;
+    offset?: number;
+  }): Promise<{
+    transactions: Array<{
+      id: string;
+      description: string;
+      date: string;
+      amount: string;
+      status: string;
+      status_color: string;
+      order_id: number;
+    }>;
+    total: number;
+    limit: number;
+    offset: number;
+  }> => {
+    const queryParams = new URLSearchParams();
+    if (params?.limit) queryParams.append('limit', params.limit.toString());
+    if (params?.offset) queryParams.append('offset', params.offset.toString());
     
     const response = await apiClient.get(
-      `/seller/earnings/?${params.toString()}`
+      `/seller/transactions/?${queryParams.toString()}`
     );
+    return response.data;
+  },
+
+  /**
+   * Get product performance statistics
+   * GET /api/seller/product-performance/
+   */
+  getProductPerformance: async (): Promise<{
+    products: Array<{
+      name: string;
+      sales: number;
+      revenue: string;
+    }>;
+  }> => {
+    const response = await apiClient.get('/seller/product-performance/');
     return response.data;
   },
 
@@ -115,9 +170,45 @@ export const sellerService = {
   getSellerOrders: async (filters?: {
     status?: string;
     ordering?: string;
-    page?: number;
-    page_size?: number;
-  }): Promise<any> => {
+  }): Promise<{
+    results: Array<{
+      id: number;
+      order_number: string;
+      buyer: number;
+      buyer_username: string;
+      seller: number | null;
+      seller_username: string | null;
+      product: number | null;
+      product_name: string | null;
+      order_type: 'auction' | 'fixed_price' | 'cart';
+      quantity: number | null;
+      unit_price: string | null;
+      total_amount: string;
+      platform_fee: string;
+      seller_amount: string | null;
+      shipping_address: number;
+      shipping_address_detail: {
+        id: number;
+        street_address: string;
+        city_name: string;
+        province_name: string;
+        postal_code: string;
+      };
+      status: 'pending_payment' | 'payment_failed' | 'paid' | 'shipped' | 'delivered' | 'cancelled';
+      created_at: string;
+      paid_at: string | null;
+      shipped_at: string | null;
+      delivered_at: string | null;
+      items?: Array<{
+        id: number;
+        product_name: string;
+        quantity: number;
+        unit_price: string;
+        subtotal: string;
+      }>;
+    }>;
+    count: number;
+  }> => {
     const params = new URLSearchParams();
     params.append('role', 'seller');
     
@@ -132,7 +223,13 @@ export const sellerService = {
     const response = await apiClient.get(
       `/orders/?${params.toString()}`
     );
-    return response.data;
+    
+    // Backend returns array directly, not paginated
+    const data = response.data;
+    return {
+      results: Array.isArray(data) ? data : data.results || [],
+      count: Array.isArray(data) ? data.length : data.count || 0
+    };
   },
 
   /**
@@ -236,6 +333,18 @@ export const sellerService = {
     discount_end_date?: string | null;
   }): Promise<any> => {
     const response = await apiClient.patch(`/listings/${listingId}/`, data);
+    return response.data;
+  },
+
+  /**
+   * Toggle listing status (activate/deactivate)
+   * POST /api/listings/{id}/toggle_status/
+   */
+  toggleListingStatus: async (listingId: number): Promise<{
+    message: string;
+    status: 'active' | 'inactive';
+  }> => {
+    const response = await apiClient.post(`/listings/${listingId}/toggle_status/`);
     return response.data;
   },
 

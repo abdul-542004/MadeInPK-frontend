@@ -49,4 +49,36 @@ export const authService = {
     const response = await apiClient.get<User>('/auth/profile/');
     return response.data;
   },
+
+  /**
+   * Update current user profile
+   * @param data - Partial user data to update
+   * @returns Updated user data
+   */
+  updateProfile: async (data: Partial<User>): Promise<User> => {
+    const response = await apiClient.patch<User>('/auth/profile/', data);
+    return response.data;
+  },
+
+  /**
+   * Become a seller
+   * @param data - Seller profile data
+   * @returns Updated user and seller profile data
+   */
+  becomeSeller: async (data: {
+    brand_name?: string;
+    biography?: string;
+    business_address_text?: string;  // Legacy text field
+    business_address_id?: number;    // New address ID field
+    business_phone?: string;
+    website?: string;
+    social_media_links?: Record<string, string>;
+  }): Promise<{
+    message: string;
+    user: User;
+    seller_profile: any;
+  }> => {
+    const response = await apiClient.post('/auth/become-seller/', data);
+    return response.data;
+  },
 };

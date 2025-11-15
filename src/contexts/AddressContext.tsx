@@ -14,18 +14,13 @@ import { useAuth } from "./AuthContext";
 export interface Address {
   id: number;
   user?: number;
-  full_name: string;
-  phone_number: string;
-  address_line1: string;
-  address_line2?: string;
+  street_address: string;
   city: number;
   city_name?: string;
-  province: number;
   province_name?: string;
   postal_code: string;
   is_default: boolean;
   created_at?: string;
-  updated_at?: string;
 }
 
 interface AddressContextType {
@@ -75,6 +70,7 @@ export function AddressProvider({ children }: { children: ReactNode }) {
         const data = await addressService.getAddresses();
         // Ensure data is always an array
         const addressArray = Array.isArray(data) ? data : [];
+        console.log('Loaded addresses from backend:', addressArray);
         setAddresses(addressArray);
       }
     } catch (error) {
@@ -111,6 +107,7 @@ export function AddressProvider({ children }: { children: ReactNode }) {
 
   const loadCities = async (provinceId?: number) => {
     try {
+      console.log('Loading cities for province:', provinceId);
       if (MOCK_MODE) {
         // Mock cities
         const mockCities: City[] = [
@@ -123,10 +120,13 @@ export function AddressProvider({ children }: { children: ReactNode }) {
         setCities(provinceId ? mockCities.filter(c => c.province === provinceId) : mockCities);
       } else {
         const data = await addressService.getCities(provinceId);
+        console.log('Loaded cities:', data);
         setCities(data);
       }
     } catch (error) {
       console.error('Failed to load cities:', error);
+      setCities([]);
+      toast.error('Failed to load cities');
     }
   };
 
@@ -149,10 +149,8 @@ export function AddressProvider({ children }: { children: ReactNode }) {
           user: user?.id || 0,
           is_default: addressData.is_default || addresses.length === 0,
           city_name: selectedCity?.name || '',
-          province: selectedProvince?.id || 0,
           province_name: selectedProvince?.name || '',
           created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
         };
         const updated = [...addresses, newAddress];
         setAddresses(updated);

@@ -62,7 +62,7 @@ const getStatusLabel = (status?: string): string => {
 };
 
 export function SellerProducts({ onAddProduct }: SellerProductsProps) {
-  const { products, updateProduct, deleteProduct } = useSeller();
+  const { products, updateProduct, toggleProductStatus, deleteProduct } = useSeller();
   const [searchQuery, setSearchQuery] = useState("");
   const [editingProduct, setEditingProduct] = useState<SellerProductListing | null>(null);
   const [viewingProduct, setViewingProduct] = useState<SellerProductListing | null>(null);
@@ -93,6 +93,14 @@ export function SellerProducts({ onAddProduct }: SellerProductsProps) {
       // Error already handled in context
     }
     setDeletingProductId(null);
+  };
+
+  const handleToggleStatus = async (listingId: number) => {
+    try {
+      await toggleProductStatus(listingId);
+    } catch (error) {
+      // Error already handled in context
+    }
   };
 
   const handleEdit = (product: SellerProductListing) => {
@@ -342,6 +350,15 @@ export function SellerProducts({ onAddProduct }: SellerProductsProps) {
                           <DropdownMenuItem onClick={() => handleView(product)}>
                             <Eye className="mr-2 h-4 w-4" />
                             View
+                          </DropdownMenuItem>
+                          <DropdownMenuItem 
+                            onClick={() => product.listingId && handleToggleStatus(product.listingId)}
+                            disabled={product.status === 'out_of_stock' || !product.listingId}
+                          >
+                            {product.status === 'active' ? '⏸️' : '▶️'}
+                            <span className="ml-2">
+                              {product.status === 'active' ? 'Deactivate' : 'Activate'}
+                            </span>
                           </DropdownMenuItem>
                           <DropdownMenuItem
                             onClick={() => setDeletingProductId(product.id)}

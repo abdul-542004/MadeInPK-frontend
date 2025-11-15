@@ -28,7 +28,21 @@ export interface SellerProfile {
   user_email: string;
   brand_name: string;
   biography: string;
-  business_address: string;
+  business_address: string;  // Formatted address string (backward compat)
+  business_address_detail?: {  // Full address object
+    id: number;
+    street_address: string;
+    city: number;
+    city_name: string;
+    province_name: string;
+    postal_code: string;
+    is_default: boolean;
+    created_at: string;
+  } | null;
+  business_address_id: number | null;  // Address ID
+  province_id?: number | null;  // For filtering
+  province_name?: string | null;  // Province name
+  business_phone: string;
   website: string | null;
   social_media_links: Record<string, string>;
   is_verified: boolean;

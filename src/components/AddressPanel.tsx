@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "./ui/sheet";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
@@ -15,30 +15,37 @@ interface AddressPanelProps {
 export function AddressPanel({ open, onOpenChange }: AddressPanelProps) {
   const { addAddress, provinces, cities, loadCities } = useAddress();
   const [formData, setFormData] = useState({
-    full_name: "",
-    phone_number: "",
-    address_line1: "",
-    address_line2: "",
+    street_address: "",
     city: 0,
     province: 0,
     postal_code: "",
   });
+
+  // Debug logging
+  useEffect(() => {
+    console.log('AddressPanel - provinces:', provinces);
+    console.log('AddressPanel - cities:', cities);
+  }, [provinces, cities]);
 
   const handleInputChange = (field: string, value: string | number) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
   const handleProvinceChange = (provinceId: number) => {
+    console.log('Province changed to:', provinceId);
     setFormData((prev) => ({ ...prev, province: provinceId, city: 0 }));
-    loadCities(provinceId);
+    if (provinceId > 0) {
+      loadCities(provinceId);
+    } else {
+      // Clear cities if no province selected
+      loadCities(undefined);
+    }
   };
 
   const handleSubmit = async () => {
     // Validate required fields
     if (
-      !formData.full_name ||
-      !formData.phone_number ||
-      !formData.address_line1 ||
+      !formData.street_address ||
       !formData.city ||
       !formData.postal_code
     ) {
@@ -48,10 +55,7 @@ export function AddressPanel({ open, onOpenChange }: AddressPanelProps) {
 
     try {
       await addAddress({
-        full_name: formData.full_name,
-        phone_number: formData.phone_number,
-        address_line1: formData.address_line1,
-        address_line2: formData.address_line2,
+        street_address: formData.street_address,
         city: formData.city,
         postal_code: formData.postal_code,
         is_default: false,
@@ -59,10 +63,7 @@ export function AddressPanel({ open, onOpenChange }: AddressPanelProps) {
 
       // Reset form
       setFormData({
-        full_name: "",
-        phone_number: "",
-        address_line1: "",
-        address_line2: "",
+        street_address: "",
         city: 0,
         province: 0,
         postal_code: "",
@@ -84,66 +85,21 @@ export function AddressPanel({ open, onOpenChange }: AddressPanelProps) {
 
         <div className="flex-1 overflow-y-auto px-6 py-6">
           <div className="space-y-5">
-            {/* Full Name */}
+            {/* Street Address */}
             <div className="space-y-2">
-              <Label htmlFor="full_name" className="text-sm text-gray-700">
-                Full Name *
+              <Label htmlFor="street_address" className="text-sm text-gray-700">
+                Street Address *
               </Label>
               <Input
-                id="full_name"
-                value={formData.full_name}
-                onChange={(e) => handleInputChange("full_name", e.target.value)}
-                placeholder="Enter full name"
+                id="street_address"
+                value={formData.street_address}
+                onChange={(e) => handleInputChange("street_address", e.target.value)}
+                placeholder="House # / Street / Area / Landmark"
                 className="w-full"
               />
-            </div>
-
-            {/* Phone Number */}
-            <div className="space-y-2">
-              <Label htmlFor="phone_number" className="text-sm text-gray-700">
-                Phone Number *
-              </Label>
-              <div className="flex gap-3">
-                <div className="flex items-center gap-2 px-3 py-2 border rounded-md bg-gray-50 min-w-[80px]">
-                  <span className="text-lg">🇵🇰</span>
-                  <span className="text-sm">+92</span>
-                </div>
-                <Input
-                  id="phone_number"
-                  value={formData.phone_number}
-                  onChange={(e) => handleInputChange("phone_number", e.target.value)}
-                  placeholder="3001234567"
-                  className="flex-1"
-                />
-              </div>
-            </div>
-
-            {/* Address Line 1 */}
-            <div className="space-y-2">
-              <Label htmlFor="address_line1" className="text-sm text-gray-700">
-                Address Line 1 *
-              </Label>
-              <Input
-                id="address_line1"
-                value={formData.address_line1}
-                onChange={(e) => handleInputChange("address_line1", e.target.value)}
-                placeholder="House # / Street / Area"
-                className="w-full"
-              />
-            </div>
-
-            {/* Address Line 2 */}
-            <div className="space-y-2">
-              <Label htmlFor="address_line2" className="text-sm text-gray-700">
-                Address Line 2 (Optional)
-              </Label>
-              <Input
-                id="address_line2"
-                value={formData.address_line2}
-                onChange={(e) => handleInputChange("address_line2", e.target.value)}
-                placeholder="Landmark or additional details"
-                className="w-full"
-              />
+              <p className="text-xs text-gray-500">
+                Include complete address with house/building number and area
+              </p>
             </div>
 
             {/* Province */}
@@ -178,13 +134,24 @@ export function AddressPanel({ open, onOpenChange }: AddressPanelProps) {
                 className="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-emerald-500"
                 disabled={!formData.province}
               >
-                <option value={0}>Select City</option>
+                <option value={0}>
+                  {!formData.province 
+                    ? "Select a province first" 
+                    : cities.length === 0 
+                    ? "Loading cities..." 
+                    : "Select City"}
+                </option>
                 {Array.isArray(cities) && cities.map((city) => (
                   <option key={city.id} value={city.id}>
                     {city.name}
                   </option>
                 ))}
               </select>
+              {formData.province && cities.length === 0 && (
+                <p className="text-xs text-amber-600">
+                  No cities available for this province
+                </p>
+              )}
             </div>
 
             {/* Postal Code */}

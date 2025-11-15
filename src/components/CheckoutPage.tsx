@@ -138,23 +138,11 @@ export function CheckoutPage({ onBackToCart, onOrderSuccess }: CheckoutPageProps
                               </span>
                             )}
                           </div>
-                          <p className="text-sm text-gray-900 mb-1">
-                            {address.address_line1}
+                          <p className="text-sm text-gray-900">
+                            {address.street_address}
                           </p>
-                          {address.address_line2 && (
-                            <p className="text-sm text-gray-600">
-                              {address.address_line2}
-                            </p>
-                          )}
-                          <p className="text-sm text-gray-600">
+                          <p className="text-sm text-gray-600 mt-1">
                             {address.city_name}, {address.province_name} - {address.postal_code}
-                          </p>
-                          <p className="text-sm text-gray-600 mt-2">
-                            <span className="text-lg mr-1">🇵🇰</span>
-                            {address.phone_number}
-                          </p>
-                          <p className="text-sm text-gray-900 mt-1">
-                            {address.full_name}
                           </p>
                         </div>
                       </div>

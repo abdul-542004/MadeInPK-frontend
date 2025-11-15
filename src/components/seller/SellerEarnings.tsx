@@ -17,12 +17,31 @@ import { toast } from "sonner";
 export function SellerEarnings() {
   const [selectedPeriod, setSelectedPeriod] = useState("month");
   const [earningsData, setEarningsData] = useState({
-    currentMonth: 45200,
-    lastMonth: 38300,
-    totalEarnings: 234500,
-    pendingPayouts: 12500,
+    currentMonth: 0,
+    lastMonth: 0,
+    totalEarnings: 0,
+    pendingPayouts: 0,
   });
-  const [monthlyChartData, setMonthlyChartData] = useState<Array<{ month: string; amount: string }>>([]);
+  const [chartData, setChartData] = useState<{
+    week: Array<{ name: string; earnings: number }>;
+    month: Array<{ month: string; amount: string; earnings: number }>;
+    quarter: Array<{ name: string; earnings: number }>;
+    year: Array<{ name: string; earnings: number }>;
+  }>({
+    week: [],
+    month: [],
+    quarter: [],
+    year: [],
+  });
+  const [transactions, setTransactions] = useState<Array<{
+    id: string;
+    description: string;
+    date: string;
+    amount: string;
+    status: string;
+    statusColor: string;
+  }>>([]);
+  const [productPerformance, setProductPerformance] = useState<Array<{ name: string; sales: number }>>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -39,126 +58,79 @@ export function SellerEarnings() {
     // Backend mode
     try {
       setLoading(true);
+      
+      // Load earnings data
       const earnings = await sellerService.getSellerEarnings();
       
       setEarningsData({
-        currentMonth: parseFloat(earnings.completed_earnings || '0'),
-        lastMonth: 0, // Calculate from monthly data if needed
+        currentMonth: parseFloat(earnings.current_month || '0'),
+        lastMonth: parseFloat(earnings.last_month || '0'),
         totalEarnings: parseFloat(earnings.total_earnings || '0'),
-        pendingPayouts: parseFloat(earnings.pending_earnings || '0'),
+        pendingPayouts: parseFloat(earnings.pending_payouts || '0'),
       });
 
-      setMonthlyChartData(earnings.earnings_by_month || []);
+      setChartData({
+        week: earnings.earnings_by_week || [],
+        month: earnings.earnings_by_month || [],
+        quarter: earnings.earnings_by_quarter || [],
+        year: earnings.earnings_by_year || [],
+      });
+
+      // Load transactions
+      const transactionData = await sellerService.getSellerTransactions({ limit: 10 });
+      setTransactions(transactionData.transactions.map(t => ({
+        id: t.id,
+        description: t.description,
+        date: t.date,
+        amount: t.amount,
+        status: t.status,
+        statusColor: t.status_color,
+      })));
+
+      // Load product performance
+      const performanceData = await sellerService.getProductPerformance();
+      setProductPerformance(performanceData.products.map(p => ({
+        name: p.name,
+        sales: p.sales,
+      })));
+
     } catch (error: any) {
       console.error('Error loading earnings:', error);
-      toast.error(error.response?.data?.message || 'Failed to load earnings');
+      toast.error(error.response?.data?.error || 'Failed to load earnings');
     } finally {
       setLoading(false);
     }
   };
 
-  // Chart data
-  const monthlyData = [
-    { name: "Week 1", earnings: 8500 },
-    { name: "Week 2", earnings: 12300 },
-    { name: "Week 3", earnings: 10200 },
-    { name: "Week 4", earnings: 14200 },
-  ];
-
-  const quarterlyData = [
-    { name: "Jan", earnings: 35200 },
-    { name: "Feb", earnings: 38300 },
-    { name: "Mar", earnings: 45200 },
-  ];
-
-  const yearlyData = [
-    { name: "Jan", earnings: 35200 },
-    { name: "Feb", earnings: 38300 },
-    { name: "Mar", earnings: 45200 },
-    { name: "Apr", earnings: 42100 },
-    { name: "May", earnings: 48900 },
-    { name: "Jun", earnings: 51200 },
-    { name: "Jul", earnings: 47800 },
-    { name: "Aug", earnings: 52300 },
-    { name: "Sep", earnings: 49500 },
-    { name: "Oct", earnings: 45200 },
-  ];
-
-  const productPerformance = [
-    { name: "Shawls", sales: 45 },
-    { name: "Pottery", sales: 32 },
-    { name: "Jewelry", sales: 38 },
-    { name: "Metalwork", sales: 28 },
-    { name: "Carpets", sales: 15 },
-  ];
-
   const getChartData = () => {
     switch (selectedPeriod) {
       case "week":
-        return monthlyData.slice(0, 1);
+        return chartData.week;
       case "month":
-        return monthlyData;
+        return chartData.month.map(item => ({ name: item.month, earnings: item.earnings }));
       case "quarter":
-        return quarterlyData;
+        return chartData.quarter;
       case "year":
-        return yearlyData;
+        return chartData.year;
       default:
-        return monthlyData;
+        return chartData.month.map(item => ({ name: item.month, earnings: item.earnings }));
     }
   };
 
-  const transactions = [
-    {
-      id: "TXN-2025-048",
-      description: "Order ORD-2025-048 - Hand-Embroidered Shawl",
-      date: "Oct 24, 2025",
-      amount: "+7,000",
-      status: "Pending",
-      statusColor: "bg-amber-100 text-amber-700",
-    },
-    {
-      id: "TXN-2025-047",
-      description: "Order ORD-2025-047 - Blue Pottery Vase Set",
-      date: "Oct 23, 2025",
-      amount: "+2,800",
-      status: "Completed",
-      statusColor: "bg-emerald-100 text-emerald-700",
-    },
-    {
-      id: "TXN-2025-046",
-      description: "Order ORD-2025-046 - Brass Candle Holders",
-      date: "Oct 22, 2025",
-      amount: "+5,700",
-      status: "Completed",
-      statusColor: "bg-emerald-100 text-emerald-700",
-    },
-    {
-      id: "TXN-2025-045",
-      description: "Order ORD-2025-045 - Handwoven Carpet",
-      date: "Oct 21, 2025",
-      amount: "+12,500",
-      status: "Pending",
-      statusColor: "bg-amber-100 text-amber-700",
-    },
-    {
-      id: "TXN-2025-044",
-      description: "Payout to Bank Account",
-      date: "Oct 20, 2025",
-      amount: "-25,000",
-      status: "Completed",
-      statusColor: "bg-blue-100 text-blue-700",
-    },
-    {
-      id: "TXN-2025-043",
-      description: "Order ORD-2025-043 - Traditional Jewelry Set",
-      date: "Oct 18, 2025",
-      amount: "+5,500",
-      status: "Completed",
-      statusColor: "bg-emerald-100 text-emerald-700",
-    },
-  ];
+  const growthPercentage = earningsData.lastMonth > 0 
+    ? Math.round(((earningsData.currentMonth - earningsData.lastMonth) / earningsData.lastMonth) * 100)
+    : 0;
 
-  const growthPercentage = Math.round(((earningsData.currentMonth - earningsData.lastMonth) / earningsData.lastMonth) * 100);
+  if (loading) {
+    return (
+      <div className="p-6 flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading earnings data...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="p-6 space-y-6">
@@ -279,33 +251,39 @@ export function SellerEarnings() {
           <CardTitle className="text-gray-900">Product Performance</CardTitle>
         </CardHeader>
         <CardContent className="p-6">
-          <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={productPerformance}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-              <XAxis 
-                dataKey="name" 
-                stroke="#6b7280"
-                style={{ fontSize: '12px' }}
-              />
-              <YAxis 
-                stroke="#6b7280"
-                style={{ fontSize: '12px' }}
-              />
-              <Tooltip 
-                contentStyle={{
-                  backgroundColor: '#fff',
-                  border: '1px solid #e5e7eb',
-                  borderRadius: '8px',
-                }}
-                formatter={(value: number) => [`${value} sales`, 'Total Sales']}
-              />
-              <Bar 
-                dataKey="sales" 
-                fill="#059669"
-                radius={[8, 8, 0, 0]}
-              />
-            </BarChart>
-          </ResponsiveContainer>
+          {productPerformance.length > 0 ? (
+            <ResponsiveContainer width="100%" height={300}>
+              <BarChart data={productPerformance}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                <XAxis 
+                  dataKey="name" 
+                  stroke="#6b7280"
+                  style={{ fontSize: '12px' }}
+                />
+                <YAxis 
+                  stroke="#6b7280"
+                  style={{ fontSize: '12px' }}
+                />
+                <Tooltip 
+                  contentStyle={{
+                    backgroundColor: '#fff',
+                    border: '1px solid #e5e7eb',
+                    borderRadius: '8px',
+                  }}
+                  formatter={(value: number) => [`${value} sales`, 'Total Sales']}
+                />
+                <Bar 
+                  dataKey="sales" 
+                  fill="#059669"
+                  radius={[8, 8, 0, 0]}
+                />
+              </BarChart>
+            </ResponsiveContainer>
+          ) : (
+            <div className="py-12 text-center">
+              <p className="text-gray-500">No product sales data available yet.</p>
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -315,52 +293,58 @@ export function SellerEarnings() {
           <CardTitle className="text-gray-900">Transaction History</CardTitle>
         </CardHeader>
         <CardContent className="p-0">
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-gray-50 border-b border-gray-200">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs text-gray-600 uppercase tracking-wider">
-                    Transaction ID
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs text-gray-600 uppercase tracking-wider">
-                    Description
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs text-gray-600 uppercase tracking-wider">
-                    Date
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs text-gray-600 uppercase tracking-wider">
-                    Amount (PKR)
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs text-gray-600 uppercase tracking-wider">
-                    Status
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200">
-                {transactions.map((transaction) => (
-                  <tr key={transaction.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="text-sm text-gray-900">{transaction.id}</span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className="text-sm text-gray-700">{transaction.description}</span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="text-sm text-gray-600">{transaction.date}</span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`text-sm ${transaction.amount.startsWith('+') ? 'text-emerald-600' : 'text-red-600'}`}>
-                        {transaction.amount}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <Badge className={`${transaction.statusColor}`}>{transaction.status}</Badge>
-                    </td>
+          {transactions.length > 0 ? (
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-gray-50 border-b border-gray-200">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs text-gray-600 uppercase tracking-wider">
+                      Transaction ID
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs text-gray-600 uppercase tracking-wider">
+                      Description
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs text-gray-600 uppercase tracking-wider">
+                      Date
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs text-gray-600 uppercase tracking-wider">
+                      Amount (PKR)
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs text-gray-600 uppercase tracking-wider">
+                      Status
+                    </th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody className="divide-y divide-gray-200">
+                  {transactions.map((transaction) => (
+                    <tr key={transaction.id} className="hover:bg-gray-50">
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className="text-sm text-gray-900">{transaction.id}</span>
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className="text-sm text-gray-700">{transaction.description}</span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className="text-sm text-gray-600">{transaction.date}</span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className={`text-sm ${transaction.amount.startsWith('+') ? 'text-emerald-600' : 'text-red-600'}`}>
+                          {transaction.amount}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <Badge className={`${transaction.statusColor}`}>{transaction.status}</Badge>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="p-12 text-center">
+              <p className="text-gray-500">No transactions yet. Start selling to see your transaction history!</p>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

@@ -25,7 +25,7 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
   signup: (userData: RegisterRequest) => Promise<{ success: boolean; errors?: Record<string, string[]> }>;
   logout: () => Promise<void>;
-  updateProfile: (data: Partial<User>) => void;
+  updateProfile: (data: Partial<User>) => Promise<void>;
   refreshProfile: () => Promise<void>;
   becomeSeller: (sellerInfo: SellerInfo) => void;
 }
@@ -104,10 +104,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       
       const response = await authService.login({ email, password });
       
-      // Save token and user data
+      // Save token
       localStorage.setItem('authToken', response.token);
-      localStorage.setItem('user', JSON.stringify(response.user));
-      setUser(response.user);
+      
+      // Fetch full profile data
+      const userData = await authService.getProfile();
+      localStorage.setItem('user', JSON.stringify(userData));
+      setUser(userData);
       
       return { success: true };
     } catch (error) {
@@ -127,10 +130,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const response = await authService.register(userData);
       
-      // Save token and user data
+      // Save token
       localStorage.setItem('authToken', response.token);
-      localStorage.setItem('user', JSON.stringify(response.user));
-      setUser(response.user);
+      
+      // Fetch full profile data
+      const userProfile = await authService.getProfile();
+      localStorage.setItem('user', JSON.stringify(userProfile));
+      setUser(userProfile);
       
       return { success: true };
     } catch (error) {
@@ -144,11 +150,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const becomeSeller = (sellerInfo: SellerInfo) => {
-    // This would need to call a backend API to upgrade user to seller
-    // For now, just log the seller info
-    console.log('Become seller:', sellerInfo);
-    toast.info('Seller registration feature coming soon!');
+  const becomeSeller = async (sellerInfo: SellerInfo) => {
+    if (MOCK_MODE) {
+      // Mock mode: just update role locally
+      if (user) {
+        const updatedUser = { ...user, role: 'both' as UserRole };
+        setUser(updatedUser);
+        localStorage.setItem('user', JSON.stringify(updatedUser));
+      }
+      toast.success('Seller registration successful!');
+    } else {
+      // This should be called after the API request is made in MyAccountPanel
+      // Just refresh the profile here
+      await refreshProfile();
+    }
   };
 
   const logout = async () => {
@@ -164,17 +179,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const updateProfile = (data: Partial<User>) => {
-    if (user) {
+  const updateProfile = async (data: Partial<User>) => {
+    if (!user) return;
+    
+    if (MOCK_MODE) {
       const updatedUser = { ...user, ...data };
       setUser(updatedUser);
       localStorage.setItem('user', JSON.stringify(updatedUser));
+    } else {
+      try {
+        const updatedUser = await authService.updateProfile(data);
+        setUser(updatedUser);
+        localStorage.setItem('user', JSON.stringify(updatedUser));
+      } catch (error) {
+        console.error('Failed to update profile:', error);
+        throw error;
+      }
     }
   };
 
   const refreshProfile = async () => {
     try {
       const userData = await authService.getProfile();
+      console.log('Profile refreshed:', userData);
       setUser(userData);
       localStorage.setItem('user', JSON.stringify(userData));
     } catch (error) {
