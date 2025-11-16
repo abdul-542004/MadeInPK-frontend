@@ -159,7 +159,6 @@ export function SellerOrders() {
   const activeOrders = filteredOrders.filter((o) => 
     !["delivered", "cancelled"].includes(o.status)
   );
-  const paidOrders = activeOrders.filter((o) => o.status === "paid");
   const shippedOrders = activeOrders.filter((o) => o.status === "shipped");
   const pendingOrders = activeOrders.filter((o) => o.status === "pending_payment");
 
@@ -289,7 +288,7 @@ export function SellerOrders() {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <Card className="border-gray-200">
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
@@ -299,20 +298,6 @@ export function SellerOrders() {
               </div>
               <div className="bg-amber-50 p-3 rounded-lg">
                 <Package className="h-6 w-6 text-amber-600" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="border-gray-200">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600 mb-1">Paid</p>
-                <h3 className="text-gray-900">{paidOrders.length}</h3>
-              </div>
-              <div className="bg-blue-50 p-3 rounded-lg">
-                <Package className="h-6 w-6 text-blue-600" />
               </div>
             </div>
           </CardContent>
@@ -359,7 +344,6 @@ export function SellerOrders() {
               <TabsList className="bg-transparent">
                 <TabsTrigger value="all">All ({activeOrders.length})</TabsTrigger>
                 <TabsTrigger value="pending">Pending Payment ({pendingOrders.length})</TabsTrigger>
-                <TabsTrigger value="paid">Paid ({paidOrders.length})</TabsTrigger>
                 <TabsTrigger value="shipped">Shipped ({shippedOrders.length})</TabsTrigger>
               </TabsList>
             </div>
@@ -368,9 +352,6 @@ export function SellerOrders() {
             </TabsContent>
             <TabsContent value="pending">
               <OrdersTable orders={pendingOrders} />
-            </TabsContent>
-            <TabsContent value="paid">
-              <OrdersTable orders={paidOrders} />
             </TabsContent>
             <TabsContent value="shipped">
               <OrdersTable orders={shippedOrders} />

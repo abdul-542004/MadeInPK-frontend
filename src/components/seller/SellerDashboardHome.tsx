@@ -98,7 +98,7 @@ export function SellerDashboardHome({ onAddProduct }: SellerDashboardHomeProps) 
   ];
 
   const recentOrders = orders
-    .filter(o => !["delivered", "cancelled"].includes(o.status))
+    .filter(o => !["shipped", "delivered", "cancelled"].includes(o.status))
     .slice(0, 4);
 
   const recentProducts = products.slice(0, 4);

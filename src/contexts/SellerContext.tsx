@@ -84,6 +84,7 @@ interface SellerContextType {
     discount_percentage?: number | null;
     discount_start_date?: string | null;
     discount_end_date?: string | null;
+    featured?: boolean;
   }) => Promise<void>;
   toggleProductStatus: (listingId: number) => Promise<void>;
   deleteProduct: (productId: number) => Promise<void>;
@@ -336,6 +337,14 @@ export function SellerProvider({ children }: { children: ReactNode }) {
         ? getCategoryIdByName(productData.category) 
         : productData.category;
       
+      console.log('Creating product with data:', {
+        name: productData.name,
+        description: productData.description,
+        category: categoryId,
+        condition: productData.condition,
+        imageCount: productData.images?.length || 0,
+      });
+      
       const createdProduct = await productService.createProduct({
         name: productData.name,
         description: productData.description,
@@ -344,17 +353,33 @@ export function SellerProvider({ children }: { children: ReactNode }) {
         images: productData.images,
       });
       
+      console.log('Product created successfully:', createdProduct);
+      
       // Step 2: If price and stock provided, create a fixed-price listing
       if (productData.price && productData.stock !== undefined) {
-        await productService.createFixedPriceListing({
+        const listingData: any = {
           product_id: createdProduct.id,
           price: productData.price,
           quantity: productData.stock,
-          featured: productData.featured,
-          discount_percentage: productData.discount_percentage,
-          discount_start_date: productData.discount_start_date,
-          discount_end_date: productData.discount_end_date,
-        });
+        };
+        
+        // Only include optional fields if they are defined
+        if (productData.featured !== undefined) {
+          listingData.featured = productData.featured;
+        }
+        if (productData.discount_percentage !== undefined) {
+          listingData.discount_percentage = productData.discount_percentage;
+        }
+        if (productData.discount_start_date) {
+          listingData.discount_start_date = productData.discount_start_date;
+        }
+        if (productData.discount_end_date) {
+          listingData.discount_end_date = productData.discount_end_date;
+        }
+        
+        console.log('Creating fixed-price listing with data:', listingData);
+        
+        await productService.createFixedPriceListing(listingData);
       }
       
       toast.success('Product created successfully!');
@@ -364,7 +389,8 @@ export function SellerProvider({ children }: { children: ReactNode }) {
       
     } catch (error: any) {
       console.error('Error creating product:', error);
-      toast.error(error.response?.data?.message || 'Failed to create product');
+      console.error('Error response:', error.response?.data);
+      toast.error(error.response?.data?.message || error.response?.data?.detail || 'Failed to create product');
       throw error;
     }
   };
@@ -377,6 +403,10 @@ export function SellerProvider({ children }: { children: ReactNode }) {
       price?: number;
       quantity?: number;
       status?: 'active' | 'inactive';
+      discount_percentage?: number | null;
+      discount_start_date?: string | null;
+      discount_end_date?: string | null;
+      featured?: boolean;
     }
   ) => {
     if (MOCK_MODE) {
@@ -387,6 +417,7 @@ export function SellerProvider({ children }: { children: ReactNode }) {
             price: updates.price?.toString() || p.price,
             quantity: updates.quantity ?? p.quantity,
             status: updates.status || p.status,
+            featured: updates.featured ?? p.featured,
           };
         }
         return p;
@@ -515,27 +546,22 @@ export function SellerProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    // Backend mode - create product first, then auction
+    // Backend mode - create auction with product in one request
     try {
       const categoryId = typeof auctionData.category === 'string' 
         ? getCategoryIdByName(auctionData.category) 
         : auctionData.category;
       
-      // Step 1: Create the product
-      const createdProduct = await productService.createProduct({
+      // Create the auction with product data in one request
+      const startTime = new Date().toISOString();
+      const endTime = new Date(Date.now() + getDurationInMs(auctionData.duration)).toISOString();
+      
+      await productService.createAuction({
         name: auctionData.name,
         description: auctionData.description,
         category: categoryId,
         condition: auctionData.condition,
         images: auctionData.images,
-      });
-      
-      // Step 2: Create the auction
-      const startTime = new Date().toISOString();
-      const endTime = new Date(Date.now() + getDurationInMs(auctionData.duration)).toISOString();
-      
-      await productService.createAuction({
-        product_id: createdProduct.id,
         starting_price: auctionData.starting_price,
         start_time: startTime,
         end_time: endTime,
@@ -556,6 +582,7 @@ export function SellerProvider({ children }: { children: ReactNode }) {
   // Helper function to convert duration string to milliseconds
   const getDurationInMs = (duration: string): number => {
     switch (duration) {
+      case '2 minutes': return 2 * 60 * 1000; // For testing purposes
       case '24 hours': return 24 * 60 * 60 * 1000;
       case '48 hours': return 48 * 60 * 60 * 1000;
       case '72 hours': return 72 * 60 * 60 * 1000;
@@ -809,7 +836,7 @@ function getMockStatistics(orders: SellerOrder[], products: SellerProductListing
   const totalOrders = orders.length;
   const pendingOrders = orders.filter(o => o.status === 'paid').length;
   const totalRevenue = orders
-    .filter(o => o.status === 'paid' || o.status === 'shipped' || o.status === 'delivered')
+    .filter(o => o.status === 'paid' || o.status === 'shipped')
     .reduce((sum, o) => sum + parseFloat(o.seller_amount || '0'), 0);
   
   // Calculate current month earnings
@@ -819,7 +846,7 @@ function getMockStatistics(orders: SellerOrder[], products: SellerProductListing
     .filter(o => {
       const paidAt = o.paid_at ? new Date(o.paid_at) : null;
       return paidAt && paidAt >= currentMonthStart && 
-             (o.status === 'paid' || o.status === 'shipped' || o.status === 'delivered');
+             (o.status === 'paid' || o.status === 'shipped');
     })
     .reduce((sum, o) => sum + parseFloat(o.seller_amount || '0'), 0);
   

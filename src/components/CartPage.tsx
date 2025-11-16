@@ -141,7 +141,10 @@ export function CartPage({ onContinueShopping, onCheckout }: CartPageProps) {
                                 <SelectValue />
                               </SelectTrigger>
                               <SelectContent>
-                                {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((num) => (
+                                {Array.from(
+                                  { length: Math.min(item.availableQuantity || 10, 10) },
+                                  (_, i) => i + 1
+                                ).map((num) => (
                                   <SelectItem key={num} value={num.toString()}>
                                     {num}
                                   </SelectItem>

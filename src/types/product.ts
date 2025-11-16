@@ -62,6 +62,22 @@ export interface Bid {
 
 export type AuctionStatus = 'active' | 'ended' | 'cancelled' | 'completed';
 
+export interface AuctionOrderInfo {
+  order_id: number;
+  order_number: string;
+  status: string;
+  payment_url: string;
+  total_amount: string;
+  seller_amount: string;
+  payment_deadline: string | null;
+  shipping_address?: {
+    street_address: string;
+    city_name: string;
+    province_name: string;
+    postal_code: string;
+  };
+}
+
 export interface Auction {
   id: number;
   product: Product;
@@ -72,9 +88,12 @@ export interface Auction {
   status: AuctionStatus;
   winner: number | null;
   winner_username: string | null;
+  winner_email?: string | null;
+  winning_bid_amount?: string | null;
   latest_bids: Bid[];
   total_bids: number;
   time_remaining: number;
+  order_info?: AuctionOrderInfo | null;
   created_at: string;
 }
 

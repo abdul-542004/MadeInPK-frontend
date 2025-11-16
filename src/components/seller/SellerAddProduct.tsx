@@ -23,7 +23,7 @@ export function SellerAddProduct({ onSuccess }: SellerAddProductProps) {
   const [price, setPrice] = useState("");
   const [stock, setStock] = useState("");
   const [startingPrice, setStartingPrice] = useState("");
-  const [duration, setDuration] = useState("24 hours");
+  const [duration, setDuration] = useState("2 minutes");
   const [description, setDescription] = useState("");
   const [imageFiles, setImageFiles] = useState<File[]>([]);
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
@@ -54,6 +54,7 @@ export function SellerAddProduct({ onSuccess }: SellerAddProductProps) {
   ];
 
   const durations = [
+    '2 minutes', // For testing purposes
     '24 hours',
     '48 hours',
     '72 hours',

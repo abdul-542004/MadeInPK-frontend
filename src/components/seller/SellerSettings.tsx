@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Store, User, Bell, Lock } from "lucide-react";
+import { Store, User, Bell, Lock, CreditCard } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
@@ -12,6 +12,7 @@ import { useAddress } from "../../contexts/AddressContext";
 import { sellerService } from "../../services/sellerService";
 import { authService } from "../../services/authService";
 import { toast } from "sonner";
+import { StripeConnectSetup } from "./StripeConnectSetup";
 
 export function SellerSettings() {
   const { user, updateProfile } = useAuth();
@@ -154,12 +155,12 @@ export function SellerSettings() {
         <p className="text-gray-600">Manage your seller account and preferences</p>
       </div>
 
-      {/* Store Information */}
+      {/* Store Settings */}
       <Card className="border-gray-200">
         <CardHeader className="border-b border-gray-200">
           <div className="flex items-center gap-2">
             <Store className="h-5 w-5 text-emerald-700" />
-            <CardTitle className="text-gray-900">Store Information</CardTitle>
+            <CardTitle className="text-gray-900">Store Settings</CardTitle>
           </div>
         </CardHeader>
         <CardContent className="p-6 space-y-4">
@@ -170,6 +171,7 @@ export function SellerSettings() {
               value={storeName}
               onChange={(e) => setStoreName(e.target.value)}
               className="mt-1"
+              placeholder="Your Brand Name"
             />
           </div>
           
@@ -179,22 +181,23 @@ export function SellerSettings() {
               id="storeDescription"
               value={storeDescription}
               onChange={(e) => setStoreDescription(e.target.value)}
-              className="mt-1 min-h-24"
+              className="mt-1 min-h-[100px]"
+              placeholder="Tell customers about your store..."
             />
           </div>
           
           <div>
-            <Label htmlFor="storeAddress">Store Address</Label>
+            <Label htmlFor="storeAddress">Business Address</Label>
             <select
               id="storeAddress"
               value={storeAddressId || ""}
               onChange={(e) => setStoreAddressId(e.target.value ? Number(e.target.value) : null)}
-              className="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-emerald-500 mt-1"
+              className="w-full mt-1 border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-500"
             >
-              <option value="">Select your store address</option>
+              <option value="">Select an address</option>
               {addresses.map((addr) => (
                 <option key={addr.id} value={addr.id}>
-                  {addr.street_address}, {addr.city_name}, {addr.province_name}
+                  {addr.street_address}, {addr.city.name}, {addr.city.province.name}
                 </option>
               ))}
             </select>
@@ -248,7 +251,23 @@ export function SellerSettings() {
         </CardContent>
       </Card>
 
-      {/* Personal Information */}
+      {/* Stripe Connect Setup - CRITICAL FOR RECEIVING PAYMENTS */}
+      <Card className="border-yellow-200 bg-yellow-50">
+        <CardHeader className="border-b border-yellow-200">
+          <div className="flex items-center gap-2">
+            <CreditCard className="h-5 w-5 text-yellow-700" />
+            <CardTitle className="text-gray-900">Payment Setup (Required)</CardTitle>
+          </div>
+          <p className="text-sm text-yellow-800 mt-1 font-semibold">
+            ⚠️ You must complete this to receive payments from buyers!
+          </p>
+        </CardHeader>
+        <CardContent className="p-6">
+          <StripeConnectSetup />
+        </CardContent>
+      </Card>
+
+      {/* Personal Information */}      {/* Personal Information */}
       <Card className="border-gray-200">
         <CardHeader className="border-b border-gray-200">
           <div className="flex items-center gap-2">

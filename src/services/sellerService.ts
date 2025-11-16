@@ -351,6 +351,7 @@ export const sellerService = {
     discount_percentage?: number | null;
     discount_start_date?: string | null;
     discount_end_date?: string | null;
+    featured?: boolean;
   }): Promise<any> => {
     const response = await apiClient.patch(`/listings/${listingId}/`, data);
     return response.data;

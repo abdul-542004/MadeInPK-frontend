@@ -73,10 +73,9 @@ export function MyAccountPanel({
 
   const getStatusColor = (status: Order['status']) => {
     switch (status) {
-      case 'delivered':
-        return 'text-emerald-700 bg-emerald-50';
       case 'shipped':
-        return 'text-blue-700 bg-blue-50';
+      case 'delivered':  // Legacy status, treated same as shipped
+        return 'text-emerald-700 bg-emerald-50';
       case 'paid':
         return 'text-purple-700 bg-purple-50';
       case 'pending_payment':
@@ -98,9 +97,8 @@ export function MyAccountPanel({
       case 'paid':
         return 'Processing';
       case 'shipped':
-        return 'In Transit';
-      case 'delivered':
-        return 'Delivered';
+      case 'delivered':  // Legacy status, show as "Shipped"
+        return 'Shipped';
       case 'cancelled':
         return 'Cancelled';
       default:
@@ -198,7 +196,7 @@ export function MyAccountPanel({
   const handleSellerRegistrationComplete = async (sellerData: SellerData) => {
     try {
       if (MOCK_MODE) {
-        becomeSeller(sellerData);
+        // becomeSeller(sellerData);
         toast.success("Congratulations! You are now a seller. Opening your dashboard...");
         setTimeout(() => {
           onOpenChange(false);
@@ -496,7 +494,15 @@ export function MyAccountPanel({
                   <div className="flex justify-between items-start mb-3">
                     <div>
                       <p className="text-gray-900 font-medium">{order.order_number}</p>
+                      {order.order_type === 'auction' && (
+                        <span className="inline-block text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded mt-1">
+                          Auction Win
+                        </span>
+                      )}
                       <p className="text-sm text-gray-600 mt-1">{formatDate(order.created_at)}</p>
+                      {order.product_name && (
+                        <p className="text-sm text-gray-700 mt-1">{order.product_name}</p>
+                      )}
                     </div>
                     <span className={`px-3 py-1 rounded-full text-xs ${getStatusColor(order.status)}`}>
                       {getStatusLabel(order.status)}
@@ -515,10 +521,29 @@ export function MyAccountPanel({
                         href={order.payment_url}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-sm text-emerald-700 hover:text-emerald-800 font-medium"
+                        className="inline-block w-full text-center px-4 py-2 bg-emerald-700 hover:bg-emerald-800 text-white text-sm font-medium rounded transition-colors"
                       >
                         Complete Payment →
                       </a>
+                      {order.payment_deadline && (
+                        <p className="text-xs text-red-600 mt-2 text-center">
+                          ⏰ Pay before: {formatDate(order.payment_deadline)}
+                        </p>
+                      )}
+                    </div>
+                  )}
+                  {order.status === 'paid' && (
+                    <div className="mt-3 pt-3 border-t">
+                      <p className="text-xs text-emerald-700">
+                        ✓ Payment successful. Seller will ship soon.
+                      </p>
+                    </div>
+                  )}
+                  {order.status === 'shipped' && (
+                    <div className="mt-3 pt-3 border-t">
+                      <p className="text-xs text-blue-700">
+                        ✓ Item has been shipped!
+                      </p>
                     </div>
                   )}
                 </div>

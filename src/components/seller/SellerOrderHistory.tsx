@@ -96,9 +96,9 @@ export function SellerOrderHistory() {
     return `PKR ${parseFloat(amount).toLocaleString()}`;
   };
 
-  // Filter for completed orders (Delivered, Cancelled, Shipped)
+  // Filter for completed orders (Shipped, Cancelled)
   const completedOrders = orders.filter((o) =>
-    ["delivered", "cancelled", "shipped"].includes(o.status)
+    ["shipped", "cancelled"].includes(o.status)
   );
 
   const filteredOrders = completedOrders.filter((order) =>
@@ -108,7 +108,7 @@ export function SellerOrderHistory() {
   );
 
   const totalRevenue = completedOrders
-    .filter((o) => o.status === "delivered")
+    .filter((o) => o.status === "shipped")
     .reduce((sum, order) => sum + parseFloat(order.seller_amount || '0'), 0);
 
   if (loading) {
@@ -150,9 +150,9 @@ export function SellerOrderHistory() {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600 mb-1">Delivered</p>
+                <p className="text-sm text-gray-600 mb-1">Shipped</p>
                 <h3 className="text-gray-900">
-                  {completedOrders.filter((o) => o.status === "delivered").length}
+                  {completedOrders.filter((o) => o.status === "shipped").length}
                 </h3>
               </div>
               <div className="bg-emerald-50 p-3 rounded-lg">

@@ -12,6 +12,7 @@ export interface CartItem {
   size?: string;
   listingId?: number; // Backend listing ID
   cartItemId?: number; // Backend cart item ID
+  availableQuantity?: number; // Available stock quantity from backend
 }
 
 interface CartContextType {
@@ -80,6 +81,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
       quantity: item.quantity,
       listingId: item.listing_id,
       cartItemId: item.id,
+      availableQuantity: item.available_quantity,
     }));
   };
 

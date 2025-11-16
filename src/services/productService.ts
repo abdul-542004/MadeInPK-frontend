@@ -171,15 +171,56 @@ export const productService = {
   /**
    * Create a new auction
    * POST /api/auctions/
+   * Supports both legacy two-step (product_id) and new one-step creation (with product data)
    */
   createAuction: async (auctionData: {
-    product_id: number;
+    // Legacy two-step creation
+    product_id?: number;
+    // New one-step creation
+    name?: string;
+    description?: string;
+    category?: number;
+    condition?: string;
+    images?: File[];
+    // Common fields
     starting_price: number;
     start_time: string;
     end_time: string;
   }): Promise<Auction> => {
-    const response = await apiClient.post<Auction>('/auctions/', auctionData);
-    return response.data;
+    // If product data is provided, use FormData for image upload
+    if (auctionData.name && auctionData.description) {
+      const formData = new FormData();
+      formData.append('name', auctionData.name);
+      formData.append('description', auctionData.description);
+      formData.append('category', auctionData.category!.toString());
+      formData.append('condition', auctionData.condition!);
+      formData.append('starting_price', auctionData.starting_price.toString());
+      formData.append('start_time', auctionData.start_time);
+      formData.append('end_time', auctionData.end_time);
+      
+      // Append images if provided
+      if (auctionData.images && auctionData.images.length > 0) {
+        auctionData.images.forEach((imageFile) => {
+          formData.append('images', imageFile);
+        });
+      }
+      
+      const response = await apiClient.post<Auction>('/auctions/', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+      return response.data;
+    } else {
+      // Legacy two-step creation
+      const response = await apiClient.post<Auction>('/auctions/', {
+        product_id: auctionData.product_id,
+        starting_price: auctionData.starting_price,
+        start_time: auctionData.start_time,
+        end_time: auctionData.end_time,
+      });
+      return response.data;
+    }
   },
 
   /**

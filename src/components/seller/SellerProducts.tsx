@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Search, Edit, Trash2, Eye, MoreVertical, X, Upload } from "lucide-react";
+import { Search, Edit, Trash2, Eye, MoreVertical, X, Upload, Star } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
@@ -77,6 +77,7 @@ export function SellerProducts({ onAddProduct }: SellerProductsProps) {
   const [editDiscountPercentage, setEditDiscountPercentage] = useState("");
   const [editDiscountStartDate, setEditDiscountStartDate] = useState("");
   const [editDiscountEndDate, setEditDiscountEndDate] = useState("");
+  const [editFeatured, setEditFeatured] = useState(false);
   
   // Image management state
   const [newImageFiles, setNewImageFiles] = useState<File[]>([]);
@@ -129,6 +130,9 @@ export function SellerProducts({ onAddProduct }: SellerProductsProps) {
     } else {
       setEditDiscountEndDate("");
     }
+    
+    // Set featured status
+    setEditFeatured(product.featured || false);
     
     // Reset image state
     setNewImageFiles([]);
@@ -205,6 +209,7 @@ export function SellerProducts({ onAddProduct }: SellerProductsProps) {
         discount_percentage: editHasDiscount ? Number(editDiscountPercentage) : null,
         discount_start_date: editHasDiscount ? new Date(editDiscountStartDate).toISOString() : null,
         discount_end_date: editHasDiscount ? new Date(editDiscountEndDate).toISOString() : null,
+        featured: editFeatured,
       });
       
       // Delete marked images
@@ -315,7 +320,15 @@ export function SellerProducts({ onAddProduct }: SellerProductsProps) {
                           alt={product.name}
                           className="w-12 h-12 rounded-lg object-cover"
                         />
-                        <span className="text-sm text-gray-900">{product.name}</span>
+                        <div className="flex flex-col">
+                          <span className="text-sm text-gray-900">{product.name}</span>
+                          {product.featured && (
+                            <Badge className="w-fit bg-amber-100 text-amber-700 text-xs mt-1">
+                              <Star className="h-3 w-3 mr-1 fill-amber-700" />
+                              Featured
+                            </Badge>
+                          )}
+                        </div>
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
@@ -492,6 +505,25 @@ export function SellerProducts({ onAddProduct }: SellerProductsProps) {
                   </div>
                 </div>
               )}
+            </div>
+
+            {/* Featured Product Option */}
+            <div className="border-t pt-4">
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="edit-featured"
+                  checked={editFeatured}
+                  onChange={(e) => setEditFeatured(e.target.checked)}
+                  className="h-4 w-4 rounded border-gray-300 text-emerald-700 focus:ring-emerald-500"
+                />
+                <Label htmlFor="edit-featured" className="cursor-pointer">
+                  Mark as Featured Product
+                </Label>
+              </div>
+              <p className="text-xs text-gray-500 mt-1 ml-6">
+                Featured products get highlighted placement in the marketplace
+              </p>
             </div>
 
             {/* Image Management */}

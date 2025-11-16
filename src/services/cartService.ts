@@ -28,6 +28,7 @@ export interface CartItem {
   unit_price: string;
   subtotal: string;
   is_available: boolean;
+  available_quantity: number;
   seller_id: number;
   seller_username: string;
   added_at: string;
