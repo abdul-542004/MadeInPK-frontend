@@ -41,6 +41,8 @@ export function ProductDetailPage({ product: propProduct, listing: propListing, 
   const [reviews, setReviews] = useState<ProductReview[]>([]);
   const [loadingReviews, setLoadingReviews] = useState(false);
   const [submittingReview, setSubmittingReview] = useState(false);
+  const [canReview, setCanReview] = useState(false);
+  const [userHasReviewed, setUserHasReviewed] = useState(false);
   const [reviewForm, setReviewForm] = useState({
     rating: 5,
     title: '',
@@ -108,11 +110,15 @@ export function ProductDetailPage({ product: propProduct, listing: propListing, 
 
   // Type-safe access to backend product
   const backendProduct = isBackendListing ? displayProduct as any : null;
-  const productId = listing ? listing.id : product?.id || 0;
-  const isWishlisted = isInWishlist(productId);
+  
+  // IMPORTANT: Use base product ID for reviews, not listing ID
+  const baseProductId = isBackendListing ? listing.product.id : product?.id || 0;
+  const listingId = listing ? listing.id : product?.id || 0; // For cart/wishlist operations
+  
+  const isWishlisted = isInWishlist(listingId);
   
   // Get base product ID for messaging (from listing.product.id, not listing.id)
-  const baseProductId = listing ? listing.product.id : undefined;
+  const messageProductId = listing ? listing.product.id : undefined;
 
   // Get seller info
   const sellerId = isBackendListing ? backendProduct?.seller : 1; // Default to 1 for mock
@@ -125,7 +131,7 @@ export function ProductDetailPage({ product: propProduct, listing: propListing, 
 
   // Load reviews
   const loadReviews = async () => {
-    if (!productId) return;
+    if (!baseProductId) return;
     
     try {
       setLoadingReviews(true);
@@ -135,7 +141,7 @@ export function ProductDetailPage({ product: propProduct, listing: propListing, 
         const mockReviews: ProductReview[] = [
           {
             id: 1,
-            product: productId,
+            product: baseProductId,
             product_name: displayProduct?.name || '',
             buyer: 1,
             buyer_username: 'Ayesha K.',
@@ -149,7 +155,7 @@ export function ProductDetailPage({ product: propProduct, listing: propListing, 
           },
           {
             id: 2,
-            product: productId,
+            product: baseProductId,
             product_name: displayProduct?.name || '',
             buyer: 2,
             buyer_username: 'Ahmed R.',
@@ -163,7 +169,7 @@ export function ProductDetailPage({ product: propProduct, listing: propListing, 
           },
           {
             id: 3,
-            product: productId,
+            product: baseProductId,
             product_name: displayProduct?.name || '',
             buyer: 3,
             buyer_username: 'Fatima S.',
@@ -177,9 +183,26 @@ export function ProductDetailPage({ product: propProduct, listing: propListing, 
           },
         ];
         setReviews(mockReviews);
+        
+        // Mock: allow review if logged in and not the seller
+        if (isAuthenticated && !isOwner) {
+          setCanReview(true);
+        }
       } else {
-        const reviewsData = await reviewService.getProductReviews(productId);
+        const reviewsData = await reviewService.getProductReviews(baseProductId);
         setReviews(reviewsData);
+        
+        // Check if user can review this product using the backend endpoint
+        if (isAuthenticated) {
+          try {
+            const canReviewData = await reviewService.canReviewProduct(baseProductId);
+            setCanReview(canReviewData.can_review);
+            setUserHasReviewed(canReviewData.has_reviewed);
+          } catch (error) {
+            console.error('Failed to check review eligibility:', error);
+            setCanReview(false);
+          }
+        }
       }
     } catch (error) {
       console.error('Failed to load reviews:', error);
@@ -191,7 +214,7 @@ export function ProductDetailPage({ product: propProduct, listing: propListing, 
 
   useEffect(() => {
     loadReviews();
-  }, [productId]);
+  }, [baseProductId, isAuthenticated, user]);
 
   // Submit review
   const handleSubmitReview = async () => {
@@ -205,7 +228,7 @@ export function ProductDetailPage({ product: propProduct, listing: propListing, 
       return;
     }
 
-    if (!productId) return;
+    if (!baseProductId) return;
 
     try {
       setSubmittingReview(true);
@@ -214,7 +237,7 @@ export function ProductDetailPage({ product: propProduct, listing: propListing, 
         // Mock review submission
         const newReview: ProductReview = {
           id: reviews.length + 1,
-          product: productId,
+          product: baseProductId,
           product_name: displayProduct?.name || '',
           buyer: user?.id || 0,
           buyer_username: user?.username || 'Anonymous',
@@ -230,7 +253,7 @@ export function ProductDetailPage({ product: propProduct, listing: propListing, 
         toast.success('Review submitted successfully!');
       } else {
         const reviewData: CreateReviewRequest = {
-          product: productId,
+          product: baseProductId,
           rating: reviewForm.rating,
           title: reviewForm.title,
           comment: reviewForm.comment,
@@ -248,7 +271,18 @@ export function ProductDetailPage({ product: propProduct, listing: propListing, 
       });
     } catch (error: any) {
       console.error('Failed to submit review:', error);
-      toast.error(error.response?.data?.message || 'Failed to submit review');
+      const errorMessage = error.response?.data?.non_field_errors?.[0] || 
+                          error.response?.data?.detail ||
+                          error.response?.data?.message || 
+                          'Failed to submit review';
+      
+      // Handle specific error for already reviewed
+      if (errorMessage.includes('already reviewed')) {
+        setUserHasReviewed(true);
+        toast.error('You have already reviewed this product');
+      } else {
+        toast.error(errorMessage);
+      }
     } finally {
       setSubmittingReview(false);
     }
@@ -277,8 +311,8 @@ export function ProductDetailPage({ product: propProduct, listing: propListing, 
   };
 
   const handleWishlistClick = () => {
-    if (productId) {
-      toggleWishlist(productId);
+    if (listingId) {
+      toggleWishlist(listingId);
     } else {
       toast.info("Cannot add to wishlist!");
     }
@@ -295,7 +329,7 @@ export function ProductDetailPage({ product: propProduct, listing: propListing, 
       const backendProduct = listing.product;
       await addToCart(
         {
-          id: backendProduct.id,
+          id: listing.id, // Use listing ID, not base product ID
           name: backendProduct.name,
           price: backendCurrentPrice || 0,
           image: backendProduct.images?.[0]?.image_url || '',
@@ -681,9 +715,15 @@ export function ProductDetailPage({ product: propProduct, listing: propListing, 
               <TabsContent value="reviews" className="mt-6">
                 <div className="space-y-6">
                   {/* Review Submission Form */}
-                  {isAuthenticated ? (
+                  {isAuthenticated && canReview && !userHasReviewed && !isOwner ? (
                     <div className="p-6 bg-gray-50 rounded-lg border border-gray-200">
                       <h4 className="text-lg font-semibold text-gray-900 mb-4">Write a Review</h4>
+                      {!MOCK_MODE && (
+                        <p className="text-sm text-gray-600 mb-4">
+                          <strong>Note:</strong> You can only review products after purchasing and receiving them. 
+                          Your review will be marked as a "Verified Purchase" if linked to an order.
+                        </p>
+                      )}
                       <div className="space-y-4">
                         {/* Rating */}
                         <div>
@@ -760,13 +800,25 @@ export function ProductDetailPage({ product: propProduct, listing: propListing, 
                         </Button>
                       </div>
                     </div>
-                  ) : (
-                    <div className="p-6 bg-gray-50 rounded-lg border border-gray-200 text-center">
-                      <p className="text-gray-600">
-                        Please <button className="text-emerald-700 font-medium hover:underline">login</button> to write a review
+                  ) : userHasReviewed ? (
+                    <div className="p-6 bg-blue-50 rounded-lg border border-blue-200 text-center">
+                      <p className="text-blue-700 font-medium">
+                        You have already submitted a review for this product
                       </p>
                     </div>
-                  )}
+                  ) : isOwner ? (
+                    <div className="p-6 bg-gray-50 rounded-lg border border-gray-200 text-center">
+                      <p className="text-gray-600">
+                        Product owners cannot review their own products
+                      </p>
+                    </div>
+                  ) : !isAuthenticated ? (
+                    <div className="p-6 bg-gray-50 rounded-lg border border-gray-200 text-center">
+                      <p className="text-gray-600">
+                        Please login to write a review
+                      </p>
+                    </div>
+                  ) : null}
 
                   {/* Reviews List */}
                   {loadingReviews ? (
@@ -906,7 +958,7 @@ export function ProductDetailPage({ product: propProduct, listing: propListing, 
           sellerId={sellerId}
           sellerName={sellerName}
           productName={displayProduct.name}
-          productId={baseProductId}
+          productId={messageProductId}
           isOpen={showMessageBox}
           onToggle={() => setShowMessageBox(!showMessageBox)}
         />

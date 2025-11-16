@@ -8,7 +8,8 @@ import {
   Truck, 
   AlertCircle, 
   CreditCard, 
-  CheckCheck
+  CheckCheck,
+  ExternalLink
 } from "lucide-react";
 import { useNotifications } from "../contexts/NotificationContext";
 
@@ -63,6 +64,17 @@ export function NotificationPanel({ open, onOpenChange }: NotificationPanelProps
     return "over a week ago";
   };
 
+  // Extract payment URL from notification message
+  const extractPaymentUrl = (message: string): string | null => {
+    const urlMatch = message.match(/(https?:\/\/[^\s]+)/);
+    return urlMatch ? urlMatch[1] : null;
+  };
+
+  // Remove URL from message text
+  const getMessageWithoutUrl = (message: string): string => {
+    return message.replace(/(https?:\/\/[^\s]+)/, '').trim();
+  };
+
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="right" className="w-full sm:w-[400px] p-0 flex flex-col">
@@ -110,46 +122,67 @@ export function NotificationPanel({ open, onOpenChange }: NotificationPanelProps
             </div>
           ) : (
             <div className="divide-y">
-              {notifications.map((notification) => (
-                <div
-                  key={notification.id}
-                  className={`p-4 hover:bg-gray-50 transition-colors ${
-                    !notification.is_read ? "bg-emerald-50/50" : ""
-                  }`}
-                  onClick={async () => {
-                    console.log('Notification clicked:', notification.id, 'is_read:', notification.is_read);
-                    if (!notification.is_read) {
-                      console.log('Marking as read:', notification.id);
-                      await markAsRead(notification.id);
-                      console.log('Marked as read successfully');
-                    }
-                  }}
-                >
-                  <div className="flex gap-3">
-                    <div className="flex-shrink-0 mt-1">
-                      {getIcon(notification.notification_type)}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-start justify-between gap-2 mb-1">
-                        <h4 className={`text-sm ${!notification.is_read ? "text-gray-900" : "text-gray-700"}`}>
-                          {notification.title}
-                        </h4>
-                        {!notification.is_read && (
-                          <Badge className="bg-emerald-600 h-2 w-2 p-0 rounded-full flex-shrink-0" />
-                        )}
+              {notifications.map((notification) => {
+                const paymentUrl = extractPaymentUrl(notification.message);
+                const messageText = paymentUrl 
+                  ? getMessageWithoutUrl(notification.message)
+                  : notification.message;
+
+                return (
+                  <div
+                    key={notification.id}
+                    className={`p-4 hover:bg-gray-50 transition-colors ${
+                      !notification.is_read ? "bg-emerald-50/50" : ""
+                    }`}
+                    onClick={async () => {
+                      console.log('Notification clicked:', notification.id, 'is_read:', notification.is_read);
+                      if (!notification.is_read) {
+                        console.log('Marking as read:', notification.id);
+                        await markAsRead(notification.id);
+                        console.log('Marked as read successfully');
+                      }
+                    }}
+                  >
+                    <div className="flex gap-3">
+                      <div className="flex-shrink-0 mt-1">
+                        {getIcon(notification.notification_type)}
                       </div>
-                      <p className="text-sm text-gray-600 mb-2 line-clamp-2">
-                        {notification.message}
-                      </p>
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs text-gray-500">
-                          {getTimeAgo(notification.created_at)}
-                        </span>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-start justify-between gap-2 mb-1">
+                          <h4 className={`text-sm font-medium ${!notification.is_read ? "text-gray-900" : "text-gray-700"}`}>
+                            {notification.title}
+                          </h4>
+                          {!notification.is_read && (
+                            <Badge className="bg-emerald-600 h-2 w-2 p-0 rounded-full flex-shrink-0" />
+                          )}
+                        </div>
+                        <p className="text-sm text-gray-600 mb-2">
+                          {messageText}
+                        </p>
+                        {paymentUrl && (
+                          <Button
+                            size="sm"
+                            className="bg-emerald-600 hover:bg-emerald-700 text-white mt-2 mb-2"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              window.open(paymentUrl, '_blank');
+                            }}
+                          >
+                            <CreditCard className="w-4 h-4 mr-2" />
+                            Complete Payment
+                            <ExternalLink className="w-3 h-3 ml-2" />
+                          </Button>
+                        )}
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs text-gray-500">
+                            {getTimeAgo(notification.created_at)}
+                          </span>
+                        </div>
                       </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </ScrollArea>

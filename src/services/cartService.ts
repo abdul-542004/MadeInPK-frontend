@@ -18,6 +18,8 @@ export interface CartItemProduct {
     is_primary: boolean;
   }>;
   listing_type: string;
+  average_rating?: number;
+  total_reviews?: number;
 }
 
 export interface CartItem {

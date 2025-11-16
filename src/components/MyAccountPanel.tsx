@@ -5,13 +5,15 @@ import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { Separator } from "./ui/separator";
-import { User, MapPin, Heart, Package, LogOut, Mail, Phone, Store } from "lucide-react";
+import { User, MapPin, Heart, Package, LogOut, Mail, Phone, Store, MessageSquare, Star } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 import { toast } from "sonner";
 import { SellerRegistrationForm, SellerData } from "./SellerRegistrationForm";
 import { orderService, Order } from "../services/orderService";
 import { authService } from "../services/authService";
 import { MOCK_MODE } from "../lib/mockMode";
+import { ComplaintDialog } from "./ComplaintDialog";
+import { FeedbackDialog } from "./FeedbackDialog";
 
 interface MyAccountPanelProps {
   open: boolean;
@@ -40,6 +42,11 @@ export function MyAccountPanel({
   const [showSellerRegistration, setShowSellerRegistration] = useState(false);
   const [orders, setOrders] = useState<Order[]>([]);
   const [loadingOrders, setLoadingOrders] = useState(false);
+  
+  // Complaint & Feedback Dialog state
+  const [complaintDialogOpen, setComplaintDialogOpen] = useState(false);
+  const [feedbackDialogOpen, setFeedbackDialogOpen] = useState(false);
+  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
 
   // Update form fields when user changes
   useEffect(() => {
@@ -216,12 +223,21 @@ export function MyAccountPanel({
         // Update user in context
         updateProfile(response.user);
         
-        toast.success("Congratulations! You are now a seller. Opening your dashboard...");
+        toast.success("Congratulations! You are now a seller.");
+        
+        // Guide user to complete seller setup
+        setTimeout(() => {
+          toast.info("Complete Your Seller Setup", {
+            description: "Next steps:\n1. Go to Settings → Store Settings to add business details\n2. Set up Stripe Connect to receive payments\n\nThese are required before you can start selling.",
+            duration: 10000,
+          });
+        }, 1500);
+        
         setTimeout(() => {
           setShowSellerRegistration(false);
           onOpenChange(false);
           onOpenSellerDashboard?.();
-        }, 1000);
+        }, 2000);
       }
     } catch (error: any) {
       console.error('Failed to become seller:', error);
@@ -286,7 +302,10 @@ export function MyAccountPanel({
         {/* Only show My Orders for buyers (role='buyer' or role='both') */}
         {isBuyer && (
           <button
-            onClick={() => setCurrentView("orders")}
+            onClick={() => {
+              onOpenChange(false);
+              onNavigate?.("my-orders");
+            }}
             className="w-full flex items-center gap-3 px-6 py-3 hover:bg-emerald-50 transition-colors text-left"
           >
             <Package className="h-5 w-5 text-gray-600" />
@@ -540,10 +559,38 @@ export function MyAccountPanel({
                     </div>
                   )}
                   {order.status === 'shipped' && (
-                    <div className="mt-3 pt-3 border-t">
+                    <div className="mt-3 pt-3 border-t space-y-2">
                       <p className="text-xs text-blue-700">
                         ✓ Item has been shipped!
                       </p>
+                      <div className="flex gap-2">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="flex-1 text-xs"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedOrder(order);
+                            setFeedbackDialogOpen(true);
+                          }}
+                        >
+                          <Star className="h-3 w-3 mr-1" />
+                          Rate Seller
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="flex-1 text-xs"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedOrder(order);
+                            setComplaintDialogOpen(true);
+                          }}
+                        >
+                          <MessageSquare className="h-3 w-3 mr-1" />
+                          Report Issue
+                        </Button>
+                      </div>
                     </div>
                   )}
                 </div>
@@ -606,6 +653,30 @@ export function MyAccountPanel({
         onOpenChange={setShowSellerRegistration}
         onComplete={handleSellerRegistrationComplete}
       />
+      
+      {/* Complaint Dialog */}
+      {selectedOrder && (
+        <ComplaintDialog
+          open={complaintDialogOpen}
+          onOpenChange={setComplaintDialogOpen}
+          orderId={selectedOrder.id}
+          sellerId={selectedOrder.seller || undefined}
+          productName={selectedOrder.product_name || 'Order ' + selectedOrder.order_number}
+        />
+      )}
+      
+      {/* Feedback Dialog */}
+      {selectedOrder && (
+        <FeedbackDialog
+          open={feedbackDialogOpen}
+          onOpenChange={setFeedbackDialogOpen}
+          orderId={selectedOrder.id}
+          orderNumber={selectedOrder.order_number}
+          productName={selectedOrder.product_name || 'Order ' + selectedOrder.order_number}
+          sellerName={selectedOrder.seller_username || 'Seller'}
+          onSuccess={loadOrders}
+        />
+      )}
     </>
   );
 }

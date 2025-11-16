@@ -33,6 +33,7 @@ import { MyAccountPanel } from "./components/MyAccountPanel";
 import { AddressPanel } from "./components/AddressPanel";
 import { ManageAddressesPanel } from "./components/ManageAddressesPanel";
 import { NotificationPanel } from "./components/NotificationPanel";
+import { MyOrdersPage } from "./components/MyOrdersPage";
 
 // Main App wrapper with Router
 function AppContent() {
@@ -79,6 +80,7 @@ function AppContent() {
       cart: "/cart",
       checkout: "/checkout",
       "order-success": "/order-success",
+      "my-orders": "/my-orders",
       about: "/about",
       heritage: "/heritage",
       "admin-dashboard": "/admin-dashboard",
@@ -202,6 +204,14 @@ function AppContent() {
           } 
         />
         <Route path="/order-success" element={<OrderSuccessPage />} />
+        <Route 
+          path="/my-orders" 
+          element={
+            <MyOrdersPage 
+              onBack={() => navigate("/")}
+            />
+          } 
+        />
         <Route path="/about" element={<AboutUsPage />} />
         <Route path="/heritage" element={<HeritagePage />} />
         <Route path="/admin-dashboard" element={<AdminDashboard onNavigate={handleNavigate} />} />

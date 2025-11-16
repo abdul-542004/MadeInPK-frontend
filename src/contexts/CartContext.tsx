@@ -72,7 +72,8 @@ export function CartProvider({ children }: { children: ReactNode }) {
         name: item.product.name,
         price: parseFloat(item.unit_price),
         image: item.product.images.find(img => img.is_primary)?.image || item.product.images[0]?.image || '',
-        rating: 4.5, // Default rating
+        rating: item.product.average_rating || 0,
+        reviews: item.product.total_reviews || 0,
         artisan: item.seller_username,
         category: item.product.category_name,
         description: item.product.description,

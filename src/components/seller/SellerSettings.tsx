@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
-import { Store, User, Bell, Lock, CreditCard } from "lucide-react";
+import { Store, User, Bell, Lock, CreditCard, AlertCircle } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
+import { Alert, AlertDescription } from "../ui/alert";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Label } from "../ui/label";
@@ -39,6 +40,7 @@ export function SellerSettings() {
   
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [isNewSeller, setIsNewSeller] = useState(false);
 
   useEffect(() => {
     loadSellerData();
@@ -58,13 +60,39 @@ export function SellerSettings() {
       }
       
       // Load seller profile data
-      const sellerProfile = await sellerService.getMySellerProfile();
-      setSellerProfileId(sellerProfile.id);
-      setStoreName(sellerProfile.brand_name || "");
-      setStoreDescription(sellerProfile.biography || "");
-      setStoreAddressId(sellerProfile.business_address_id || null);
-      setStorePhone(sellerProfile.business_phone || "");
-      setWebsite(sellerProfile.website || "");
+      try {
+        const sellerProfile = await sellerService.getMySellerProfile();
+        setSellerProfileId(sellerProfile.id);
+        setStoreName(sellerProfile.brand_name || "");
+        setStoreDescription(sellerProfile.biography || "");
+        setStoreAddressId(sellerProfile.business_address_id || null);
+        setStorePhone(sellerProfile.business_phone || "");
+        setWebsite(sellerProfile.website || "");
+        
+        // Check if this is a new seller (no store name or description)
+        setIsNewSeller(!sellerProfile.brand_name || !sellerProfile.biography);
+      } catch (error: any) {
+        // If seller profile doesn't exist, create one
+        if (error.message === 'Seller profile not found') {
+          console.log('Seller profile not found, creating one...');
+          try {
+            const newProfile = await sellerService.createSellerProfile({
+              brand_name: "",
+              biography: "",
+              business_phone: "",
+              website: "",
+              social_media_links: {}
+            });
+            setSellerProfileId(newProfile.id);
+            toast.success('Seller profile created successfully!');
+          } catch (createError: any) {
+            console.error('Failed to create seller profile:', createError);
+            toast.error('Failed to create seller profile. Please try again.');
+          }
+        } else {
+          throw error;
+        }
+      }
       
       // Load addresses
       await refreshAddresses();
@@ -155,6 +183,26 @@ export function SellerSettings() {
         <p className="text-gray-600">Manage your seller account and preferences</p>
       </div>
 
+      {/* New Seller Setup Guide */}
+      {isNewSeller && (
+        <Alert className="bg-blue-50 border-blue-200">
+          <AlertCircle className="h-4 w-4 text-blue-600" />
+          <AlertDescription className="text-blue-900">
+            <strong className="font-semibold">Complete Your Seller Setup</strong>
+            <p className="mt-1 text-sm">
+              Welcome! To start selling on MadeInPK, please complete these steps:
+            </p>
+            <ol className="mt-2 ml-4 text-sm space-y-1 list-decimal">
+              <li><strong>Store Settings</strong> - Add your business name and description below</li>
+              <li><strong>Payment Setup</strong> - Connect your Stripe account to receive payments (scroll down)</li>
+            </ol>
+            <p className="mt-2 text-sm font-medium">
+              Both steps are required before you can list products for sale.
+            </p>
+          </AlertDescription>
+        </Alert>
+      )}
+
       {/* Store Settings */}
       <Card className="border-gray-200">
         <CardHeader className="border-b border-gray-200">
@@ -197,7 +245,9 @@ export function SellerSettings() {
               <option value="">Select an address</option>
               {addresses.map((addr) => (
                 <option key={addr.id} value={addr.id}>
-                  {addr.street_address}, {addr.city.name}, {addr.city.province.name}
+                  {addr.street_address}
+                  {addr.city_name && `, ${addr.city_name}`}
+                  {addr.province_name && `, ${addr.province_name}`}
                 </option>
               ))}
             </select>

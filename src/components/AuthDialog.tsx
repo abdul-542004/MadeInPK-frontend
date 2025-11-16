@@ -85,6 +85,17 @@ export function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
     
     if (result.success) {
       toast.success("Account created successfully!");
+      
+      // Guide sellers to complete their setup
+      if (signupRole === 'seller' || signupRole === 'both') {
+        setTimeout(() => {
+          toast.info("Next Steps: Complete your seller profile in Settings", {
+            description: "1. Add your store information\n2. Set up Stripe for payments",
+            duration: 8000,
+          });
+        }, 1500);
+      }
+      
       onOpenChange(false);
       // Reset form
       setSignupUsername("");

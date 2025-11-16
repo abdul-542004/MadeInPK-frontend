@@ -70,6 +70,15 @@ export interface CreateReviewRequest {
 }
 
 /**
+ * Can Review Response
+ */
+export interface CanReviewResponse {
+  can_review: boolean;
+  reason: string;
+  has_reviewed: boolean;
+}
+
+/**
  * Review & Feedback Service
  * Handles product reviews and order feedback
  */
@@ -138,5 +147,16 @@ export const reviewService = {
    */
   deleteProductReview: async (reviewId: number): Promise<void> => {
     await apiClient.delete(`/product-reviews/${reviewId}/`);
+  },
+
+  /**
+   * Check if user can review a product
+   * @param productId - Product ID (base product, not listing)
+   */
+  canReviewProduct: async (productId: number): Promise<CanReviewResponse> => {
+    const response = await apiClient.get<CanReviewResponse>(
+      `/product-reviews/can-review/${productId}/`
+    );
+    return response.data;
   },
 };

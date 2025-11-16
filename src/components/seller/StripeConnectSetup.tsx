@@ -25,6 +25,20 @@ export function StripeConnectSetup() {
   const [onboardingUrl, setOnboardingUrl] = useState<string | null>(null);
 
   useEffect(() => {
+    // Check for Stripe setup query parameters
+    const urlParams = new URLSearchParams(window.location.search);
+    const stripeSetup = urlParams.get('stripe_setup');
+    
+    if (stripeSetup === 'success') {
+      toast.success('Stripe setup completed! Checking your account status...');
+      // Clean up URL
+      window.history.replaceState({}, '', window.location.pathname);
+    } else if (stripeSetup === 'refresh') {
+      toast.info('Please complete your Stripe setup.');
+      // Clean up URL
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+    
     checkAccountStatus();
   }, []);
 
@@ -33,14 +47,17 @@ export function StripeConnectSetup() {
     try {
       const response = await apiClient.get('/stripe/connect/account_status/');
       setAccountStatus(response.data);
-      setHasAccount(true);
+      setHasAccount(response.data.has_account !== false); // Check the flag
     } catch (error: any) {
       if (error.response?.status === 404) {
-        // No account yet
+        // No account yet - this is normal for new sellers
         setHasAccount(false);
         setAccountStatus(null);
       } else {
         console.error('Error checking account status:', error);
+        // Even on error, assume no account to allow creation
+        setHasAccount(false);
+        setAccountStatus(null);
       }
     } finally {
       setCheckingStatus(false);
