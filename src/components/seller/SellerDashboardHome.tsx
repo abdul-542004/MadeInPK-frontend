@@ -59,7 +59,7 @@ export function SellerDashboardHome({ onAddProduct }: SellerDashboardHomeProps) 
   // Use backend statistics
   const totalOrders = statistics.total_orders;
   const pendingOrders = statistics.pending_orders;
-  const earningsThisMonth = parseFloat(statistics.total_revenue);
+  const earningsThisMonth = parseFloat(statistics.current_month_earnings || '0');
   const productsListed = statistics.total_products;
 
   const stats = [
@@ -252,7 +252,9 @@ export function SellerDashboardHome({ onAddProduct }: SellerDashboardHomeProps) 
                       <span className="text-sm text-gray-900">{order.order_number}</span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="text-sm text-gray-700">{order.product_name}</span>
+                      <span className="text-sm text-gray-700">
+                        {order.product_name || (order.items && order.items.length > 0 ? `${order.items.length} items` : 'N/A')}
+                      </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span className="text-sm text-gray-600">{formatDate(order.created_at)}</span>
@@ -332,19 +334,25 @@ export function SellerDashboardHome({ onAddProduct }: SellerDashboardHomeProps) 
                 </div>
                 <div>
                   <p className="text-sm text-gray-600">Product</p>
-                  <p className="text-gray-900">{viewingOrder.product_name}</p>
+                  <p className="text-gray-900">
+                    {viewingOrder.product_name || (viewingOrder.items && viewingOrder.items.length > 0 ? `${viewingOrder.items.length} items` : 'N/A')}
+                  </p>
                 </div>
-                <div>
-                  <p className="text-sm text-gray-600">Quantity</p>
-                  <p className="text-gray-900">{viewingOrder.quantity}</p>
-                </div>
+                {!viewingOrder.is_multi_seller && viewingOrder.quantity && (
+                  <div>
+                    <p className="text-sm text-gray-600">Quantity</p>
+                    <p className="text-gray-900">{viewingOrder.quantity}</p>
+                  </div>
+                )}
                 <div>
                   <p className="text-sm text-gray-600">Total Amount</p>
                   <p className="text-gray-900">PKR {parseFloat(viewingOrder.total_amount).toLocaleString()}</p>
                 </div>
                 <div>
                   <p className="text-sm text-gray-600">Your Earnings</p>
-                  <p className="text-gray-900">PKR {parseFloat(viewingOrder.seller_amount).toLocaleString()}</p>
+                  <p className="text-gray-900">
+                    PKR {viewingOrder.seller_amount ? parseFloat(viewingOrder.seller_amount).toLocaleString() : 'N/A'}
+                  </p>
                 </div>
                 <div>
                   <p className="text-sm text-gray-600">Order Date</p>
@@ -355,6 +363,44 @@ export function SellerDashboardHome({ onAddProduct }: SellerDashboardHomeProps) 
                   <Badge className={getStatusColor(viewingOrder.status)}>{viewingOrder.status.replace('_', ' ')}</Badge>
                 </div>
               </div>
+              
+              {/* Show items for multi-seller orders */}
+              {viewingOrder.is_multi_seller && viewingOrder.items && viewingOrder.items.length > 0 && (
+                <div>
+                  <p className="text-sm text-gray-600 mb-2">Your Items</p>
+                  <div className="border rounded-lg overflow-hidden">
+                    <table className="w-full text-sm">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="px-4 py-2 text-left">Product</th>
+                          <th className="px-4 py-2 text-left">Quantity</th>
+                          <th className="px-4 py-2 text-left">Price</th>
+                          <th className="px-4 py-2 text-left">Subtotal</th>
+                          <th className="px-4 py-2 text-left">Shipped</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y">
+                        {viewingOrder.items.map((item) => (
+                          <tr key={item.id}>
+                            <td className="px-4 py-2">{item.product_name}</td>
+                            <td className="px-4 py-2">{item.quantity}</td>
+                            <td className="px-4 py-2">PKR {parseFloat(item.unit_price).toLocaleString()}</td>
+                            <td className="px-4 py-2">PKR {parseFloat(item.subtotal).toLocaleString()}</td>
+                            <td className="px-4 py-2">
+                              {item.is_shipped ? (
+                                <span className="text-green-600">✓ Yes</span>
+                              ) : (
+                                <span className="text-amber-600">Pending</span>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+              
               <div>
                 <p className="text-sm text-gray-600 mb-1">Shipping Address</p>
                 <p className="text-gray-900">

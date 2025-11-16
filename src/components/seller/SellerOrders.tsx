@@ -38,11 +38,20 @@ interface BackendOrder {
   shipped_at: string | null;
   delivered_at: string | null;
   items?: Array<{
+    id: number;
     product_name: string;
+    product_image: string | null;
+    seller_id: number;
+    seller_username: string;
     quantity: number;
     unit_price: string;
     subtotal: string;
+    is_shipped: boolean;
+    shipped_at: string | null;
   }>;
+  is_multi_seller?: boolean;
+  my_items_shipped?: boolean | null;
+  all_items_shipped?: boolean | null;
 }
 
 export function SellerOrders() {
@@ -221,15 +230,29 @@ export function SellerOrders() {
                   >
                     <Eye className="h-4 w-4" />
                   </Button>
+                  {/* Show mark as shipped button for single-seller paid orders or multi-seller orders where seller hasn't shipped */}
                   {order.status === 'paid' && (
-                    <Button 
-                      variant="ghost" 
-                      size="sm" 
-                      title="Mark as Shipped"
-                      onClick={() => setShippingOrderId(order.id)}
-                    >
-                      <Truck className="h-4 w-4" />
-                    </Button>
+                    order.is_multi_seller ? (
+                      !order.my_items_shipped && (
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          title="Mark My Items as Shipped"
+                          onClick={() => setShippingOrderId(order.id)}
+                        >
+                          <Truck className="h-4 w-4" />
+                        </Button>
+                      )
+                    ) : (
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        title="Mark as Shipped"
+                        onClick={() => setShippingOrderId(order.id)}
+                      >
+                        <Truck className="h-4 w-4" />
+                      </Button>
+                    )
                   )}
                 </div>
               </td>
@@ -409,7 +432,9 @@ export function SellerOrders() {
               </div>
               {viewingOrder.items && viewingOrder.items.length > 0 && (
                 <div>
-                  <p className="text-sm text-gray-600 mb-2">Order Items</p>
+                  <p className="text-sm text-gray-600 mb-2">
+                    {viewingOrder.is_multi_seller ? 'Your Items' : 'Order Items'}
+                  </p>
                   <div className="border rounded-lg overflow-hidden">
                     <table className="w-full text-sm">
                       <thead className="bg-gray-50">
@@ -418,20 +443,45 @@ export function SellerOrders() {
                           <th className="px-4 py-2 text-left">Quantity</th>
                           <th className="px-4 py-2 text-left">Price</th>
                           <th className="px-4 py-2 text-left">Subtotal</th>
+                          {viewingOrder.is_multi_seller && (
+                            <th className="px-4 py-2 text-left">Status</th>
+                          )}
                         </tr>
                       </thead>
                       <tbody className="divide-y">
-                        {viewingOrder.items.map((item, index) => (
-                          <tr key={index}>
+                        {viewingOrder.items.map((item) => (
+                          <tr key={item.id}>
                             <td className="px-4 py-2">{item.product_name}</td>
                             <td className="px-4 py-2">{item.quantity}</td>
                             <td className="px-4 py-2">{formatAmount(item.unit_price)}</td>
                             <td className="px-4 py-2">{formatAmount(item.subtotal)}</td>
+                            {viewingOrder.is_multi_seller && (
+                              <td className="px-4 py-2">
+                                {item.is_shipped ? (
+                                  <Badge className="bg-emerald-100 text-emerald-700">
+                                    Shipped
+                                  </Badge>
+                                ) : (
+                                  <Badge className="bg-amber-100 text-amber-700">
+                                    Not Shipped
+                                  </Badge>
+                                )}
+                              </td>
+                            )}
                           </tr>
                         ))}
                       </tbody>
                     </table>
                   </div>
+                  {viewingOrder.is_multi_seller && (
+                    <p className="text-xs text-gray-500 mt-2">
+                      {viewingOrder.all_items_shipped 
+                        ? '✓ All sellers have shipped their items' 
+                        : viewingOrder.my_items_shipped
+                        ? '✓ You have shipped your items. Waiting for other sellers.'
+                        : '⚠ You need to ship your items'}
+                    </p>
+                  )}
                 </div>
               )}
             </div>
@@ -439,15 +489,29 @@ export function SellerOrders() {
           <DialogFooter>
             <Button onClick={() => setViewingOrder(null)}>Close</Button>
             {viewingOrder && viewingOrder.status === 'paid' && (
-              <Button 
-                onClick={() => {
-                  setViewingOrder(null);
-                  setShippingOrderId(viewingOrder.id);
-                }}
-                className="bg-emerald-700 hover:bg-emerald-800"
-              >
-                Mark as Shipped
-              </Button>
+              viewingOrder.is_multi_seller ? (
+                !viewingOrder.my_items_shipped && (
+                  <Button 
+                    onClick={() => {
+                      setViewingOrder(null);
+                      setShippingOrderId(viewingOrder.id);
+                    }}
+                    className="bg-emerald-700 hover:bg-emerald-800"
+                  >
+                    Mark My Items as Shipped
+                  </Button>
+                )
+              ) : (
+                <Button 
+                  onClick={() => {
+                    setViewingOrder(null);
+                    setShippingOrderId(viewingOrder.id);
+                  }}
+                  className="bg-emerald-700 hover:bg-emerald-800"
+                >
+                  Mark as Shipped
+                </Button>
+              )
             )}
           </DialogFooter>
         </DialogContent>
@@ -457,9 +521,11 @@ export function SellerOrders() {
       <Dialog open={!!shippingOrderId} onOpenChange={() => setShippingOrderId(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Mark Order as Shipped</DialogTitle>
+            <DialogTitle>Mark Items as Shipped</DialogTitle>
             <DialogDescription>
-              Are you sure you want to mark this order as shipped?
+              {orders.find(o => o.id === shippingOrderId)?.is_multi_seller
+                ? 'Are you sure you want to mark your items in this order as shipped?'
+                : 'Are you sure you want to mark this order as shipped?'}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>

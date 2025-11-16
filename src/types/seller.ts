@@ -22,26 +22,44 @@ export interface ShippingAddressDetail {
   is_default: boolean;
 }
 
+export interface OrderItem {
+  id: number;
+  product: number;
+  product_name: string;
+  product_image: string | null;
+  seller_id: number;
+  seller_username: string;
+  quantity: number;
+  unit_price: string;
+  subtotal: string;
+  is_shipped: boolean;
+  shipped_at: string | null;
+}
+
 export interface SellerOrder {
   id: number;
   order_number: string;
   buyer: number;
   buyer_username: string;
-  seller: number;
-  seller_username: string;
-  product: number;
-  product_name: string;
+  seller: number | null;
+  seller_username: string | null;
+  product: number | null;
+  product_name: string | null;
   order_type: OrderType;
-  quantity: number;
-  unit_price: string;
+  quantity: number | null;
+  unit_price: string | null;
   total_amount: string;
   platform_fee: string;
-  seller_amount: string;
+  seller_amount: string | null;
   shipping_address: number;
   shipping_address_detail: ShippingAddressDetail;
   status: OrderStatus;
   payment_url: string;
   payment_deadline: string;
+  items?: OrderItem[];  // For multi-seller orders
+  is_multi_seller?: boolean;
+  my_items_shipped?: boolean | null;
+  all_items_shipped?: boolean | null;
   created_at: string;
   paid_at: string | null;
   shipped_at: string | null;
@@ -53,6 +71,7 @@ export interface SellerStatistics {
   total_orders: number;
   pending_orders: number;
   total_revenue: string;
+  current_month_earnings: string;
   total_products: number;
   active_auctions: number;
 }
@@ -62,6 +81,14 @@ export interface SellerEarnings {
   pending_earnings: string;
   completed_earnings: string;
   earnings_by_month: Array<{ month: string; amount: string }>;
+  product_performance?: Array<{
+    id: number;
+    name: string;
+    total_orders: number;
+    total_quantity_sold: number;
+    total_revenue: string;
+    average_order_value: string;
+  }>;
 }
 
 // UI representation of seller's product (combines Product and FixedPriceListing)

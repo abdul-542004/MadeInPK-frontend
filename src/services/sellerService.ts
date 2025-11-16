@@ -92,6 +92,7 @@ export const sellerService = {
     total_orders: number;
     pending_orders: number;
     total_revenue: string;
+    current_month_earnings: string;
     total_products: number;
     active_auctions: number;
   }> => {
@@ -112,6 +113,14 @@ export const sellerService = {
     earnings_by_week: Array<{ name: string; amount: string; earnings: number }>;
     earnings_by_quarter: Array<{ name: string; amount: string; earnings: number }>;
     earnings_by_year: Array<{ name: string; amount: string; earnings: number }>;
+    product_performance: Array<{
+      id: number;
+      name: string;
+      total_orders: number;
+      total_quantity_sold: number;
+      total_revenue: string;
+      average_order_value: string;
+    }>;
   }> => {
     const response = await apiClient.get('/seller/earnings/');
     return response.data;
@@ -170,6 +179,7 @@ export const sellerService = {
   getSellerOrders: async (filters?: {
     status?: string;
     ordering?: string;
+    page_size?: number;
   }): Promise<{
     results: Array<{
       id: number;
@@ -190,21 +200,31 @@ export const sellerService = {
       shipping_address_detail: {
         id: number;
         street_address: string;
+        city: number;
         city_name: string;
         province_name: string;
         postal_code: string;
+        is_default: boolean;
       };
       status: 'pending_payment' | 'payment_failed' | 'paid' | 'shipped' | 'delivered' | 'cancelled';
+      payment_url: string;
+      payment_deadline: string;
       created_at: string;
       paid_at: string | null;
       shipped_at: string | null;
       delivered_at: string | null;
       items?: Array<{
         id: number;
+        product: number;
         product_name: string;
+        product_image: string | null;
+        seller_id: number;
+        seller_username: string;
         quantity: number;
         unit_price: string;
         subtotal: string;
+        is_shipped: boolean;
+        shipped_at: string | null;
       }>;
     }>;
     count: number;

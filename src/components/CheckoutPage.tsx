@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { MapPin, Plus, ShoppingBag } from "lucide-react";
 import { Button } from "./ui/button";
 import { useCart } from "../contexts/CartContext";
@@ -17,7 +17,7 @@ interface CheckoutPageProps {
 
 export function CheckoutPage({ onBackToCart, onOrderSuccess }: CheckoutPageProps) {
   const { cartItems, getCartTotal, checkout, loading } = useCart();
-  const { addresses, getDefaultAddress } = useAddress();
+  const { addresses, getDefaultAddress, setDefaultAddress } = useAddress();
   const { user } = useAuth();
   const navigate = useNavigate();
   const [isAddressPanelOpen, setIsAddressPanelOpen] = useState(false);
@@ -26,6 +26,14 @@ export function CheckoutPage({ onBackToCart, onOrderSuccess }: CheckoutPageProps
 
   const subtotal = getCartTotal();
   const defaultAddress = getDefaultAddress();
+
+  // Auto-set first address as default if none is set
+  useEffect(() => {
+    if (addresses.length > 0 && !defaultAddress) {
+      console.log('No default address found, setting first address as default');
+      setDefaultAddress(addresses[0].id);
+    }
+  }, [addresses, defaultAddress]);
 
   const handleCheckout = async () => {
     if (!defaultAddress) {
@@ -145,6 +153,18 @@ export function CheckoutPage({ onBackToCart, onOrderSuccess }: CheckoutPageProps
                             {address.city_name}, {address.province_name} - {address.postal_code}
                           </p>
                         </div>
+                        {!address.is_default && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={async () => {
+                              await setDefaultAddress(address.id);
+                            }}
+                            className="ml-2 text-xs"
+                          >
+                            Set as Default
+                          </Button>
+                        )}
                       </div>
                     </div>
                   ))}
@@ -248,12 +268,29 @@ export function CheckoutPage({ onBackToCart, onOrderSuccess }: CheckoutPageProps
               {/* Checkout Button */}
               <Button
                 onClick={handleCheckout}
-                disabled={!defaultAddress || isProcessing || loading}
+                disabled={!defaultAddress || isProcessing || loading || cartItems.length === 0}
                 className="w-full mt-6 bg-red-500 hover:bg-red-600 text-white disabled:bg-gray-300 disabled:cursor-not-allowed"
               >
                 <ShoppingBag className="h-4 w-4 mr-2" />
                 {isProcessing || loading ? 'PROCESSING...' : 'PROCEED TO PAYMENT'}
               </Button>
+
+              {/* Show why button is disabled */}
+              {!defaultAddress && addresses.length === 0 && (
+                <p className="text-xs text-red-600 mt-2 text-center">
+                  Please add a delivery address first
+                </p>
+              )}
+              {!defaultAddress && addresses.length > 0 && (
+                <p className="text-xs text-amber-600 mt-2 text-center">
+                  Please set a default address
+                </p>
+              )}
+              {cartItems.length === 0 && (
+                <p className="text-xs text-red-600 mt-2 text-center">
+                  Your cart is empty
+                </p>
+              )}
 
               {onBackToCart && (
                 <Button

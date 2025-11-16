@@ -13,7 +13,7 @@ interface AddressPanelProps {
 }
 
 export function AddressPanel({ open, onOpenChange }: AddressPanelProps) {
-  const { addAddress, provinces, cities, loadCities } = useAddress();
+  const { addAddress, provinces, cities, loadCities, addresses } = useAddress();
   const [formData, setFormData] = useState({
     street_address: "",
     city: 0,
@@ -42,14 +42,11 @@ export function AddressPanel({ open, onOpenChange }: AddressPanelProps) {
     }
   };
 
-  const handleSubmit = async () => {
-    // Validate required fields
-    if (
-      !formData.street_address ||
-      !formData.city ||
-      !formData.postal_code
-    ) {
-      toast.error("Please fill all required fields");
+    const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!formData.province || !formData.city) {
+      toast.error("Please select both province and city");
       return;
     }
 
@@ -58,7 +55,7 @@ export function AddressPanel({ open, onOpenChange }: AddressPanelProps) {
         street_address: formData.street_address,
         city: formData.city,
         postal_code: formData.postal_code,
-        is_default: false,
+        is_default: addresses.length === 0, // First address is default
       });
 
       // Reset form

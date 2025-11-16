@@ -133,6 +133,7 @@ export function SellerProvider({ children }: { children: ReactNode }) {
     total_orders: 0,
     pending_orders: 0,
     total_revenue: '0.00',
+    current_month_earnings: '0.00',
     total_products: 0,
     active_auctions: 0,
   });
@@ -809,13 +810,25 @@ function getMockStatistics(orders: SellerOrder[], products: SellerProductListing
   const pendingOrders = orders.filter(o => o.status === 'paid').length;
   const totalRevenue = orders
     .filter(o => o.status === 'paid' || o.status === 'shipped' || o.status === 'delivered')
-    .reduce((sum, o) => sum + parseFloat(o.seller_amount), 0);
+    .reduce((sum, o) => sum + parseFloat(o.seller_amount || '0'), 0);
+  
+  // Calculate current month earnings
+  const now = new Date();
+  const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  const currentMonthRevenue = orders
+    .filter(o => {
+      const paidAt = o.paid_at ? new Date(o.paid_at) : null;
+      return paidAt && paidAt >= currentMonthStart && 
+             (o.status === 'paid' || o.status === 'shipped' || o.status === 'delivered');
+    })
+    .reduce((sum, o) => sum + parseFloat(o.seller_amount || '0'), 0);
   
   return {
     total_sales: totalOrders,
     total_orders: totalOrders,
     pending_orders: pendingOrders,
     total_revenue: totalRevenue.toFixed(2),
+    current_month_earnings: currentMonthRevenue.toFixed(2),
     total_products: products.length,
     active_auctions: 0,
   };

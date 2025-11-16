@@ -41,7 +41,14 @@ export function SellerEarnings() {
     status: string;
     statusColor: string;
   }>>([]);
-  const [productPerformance, setProductPerformance] = useState<Array<{ name: string; sales: number }>>([]);
+  const [productPerformance, setProductPerformance] = useState<Array<{
+    id: number;
+    name: string;
+    total_orders: number;
+    total_quantity_sold: number;
+    total_revenue: string;
+    average_order_value: string;
+  }>>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -76,6 +83,9 @@ export function SellerEarnings() {
         year: earnings.earnings_by_year || [],
       });
 
+      // Set product performance from earnings data
+      setProductPerformance(earnings.product_performance || []);
+
       // Load transactions
       const transactionData = await sellerService.getSellerTransactions({ limit: 10 });
       setTransactions(transactionData.transactions.map(t => ({
@@ -85,13 +95,6 @@ export function SellerEarnings() {
         amount: t.amount,
         status: t.status,
         statusColor: t.status_color,
-      })));
-
-      // Load product performance
-      const performanceData = await sellerService.getProductPerformance();
-      setProductPerformance(performanceData.products.map(p => ({
-        name: p.name,
-        sales: p.sales,
       })));
 
     } catch (error: any) {
@@ -252,33 +255,88 @@ export function SellerEarnings() {
         </CardHeader>
         <CardContent className="p-6">
           {productPerformance.length > 0 ? (
-            <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={productPerformance}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                <XAxis 
-                  dataKey="name" 
-                  stroke="#6b7280"
-                  style={{ fontSize: '12px' }}
-                />
-                <YAxis 
-                  stroke="#6b7280"
-                  style={{ fontSize: '12px' }}
-                />
-                <Tooltip 
-                  contentStyle={{
-                    backgroundColor: '#fff',
-                    border: '1px solid #e5e7eb',
-                    borderRadius: '8px',
-                  }}
-                  formatter={(value: number) => [`${value} sales`, 'Total Sales']}
-                />
-                <Bar 
-                  dataKey="sales" 
-                  fill="#059669"
-                  radius={[8, 8, 0, 0]}
-                />
-              </BarChart>
-            </ResponsiveContainer>
+            <div className="space-y-4">
+              <ResponsiveContainer width="100%" height={300}>
+                <BarChart data={productPerformance.slice(0, 10)}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                  <XAxis 
+                    dataKey="name" 
+                    stroke="#6b7280"
+                    style={{ fontSize: '12px' }}
+                    angle={-45}
+                    textAnchor="end"
+                    height={80}
+                  />
+                  <YAxis 
+                    stroke="#6b7280"
+                    style={{ fontSize: '12px' }}
+                  />
+                  <Tooltip 
+                    contentStyle={{
+                      backgroundColor: '#fff',
+                      border: '1px solid #e5e7eb',
+                      borderRadius: '8px',
+                    }}
+                    formatter={(value: number) => [`${value} orders`, 'Total Orders']}
+                  />
+                  <Bar 
+                    dataKey="total_orders" 
+                    fill="#059669"
+                    radius={[8, 8, 0, 0]}
+                  />
+                </BarChart>
+              </ResponsiveContainer>
+              
+              {/* Product Performance Table */}
+              <div className="overflow-x-auto border rounded-lg">
+                <table className="w-full">
+                  <thead className="bg-gray-50 border-b border-gray-200">
+                    <tr>
+                      <th className="px-4 py-3 text-left text-xs text-gray-600 uppercase tracking-wider">
+                        Product Name
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs text-gray-600 uppercase tracking-wider">
+                        Total Orders
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs text-gray-600 uppercase tracking-wider">
+                        Units Sold
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs text-gray-600 uppercase tracking-wider">
+                        Revenue (PKR)
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs text-gray-600 uppercase tracking-wider">
+                        Avg Order Value
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200">
+                    {productPerformance.slice(0, 10).map((product) => (
+                      <tr key={product.id} className="hover:bg-gray-50">
+                        <td className="px-4 py-3">
+                          <span className="text-sm text-gray-900 font-medium">{product.name}</span>
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className="text-sm text-gray-700">{product.total_orders}</span>
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className="text-sm text-gray-700">{product.total_quantity_sold}</span>
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className="text-sm text-emerald-600 font-medium">
+                            {parseFloat(product.total_revenue).toLocaleString()}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className="text-sm text-gray-700">
+                            {parseFloat(product.average_order_value).toLocaleString()}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
           ) : (
             <div className="py-12 text-center">
               <p className="text-gray-500">No product sales data available yet.</p>

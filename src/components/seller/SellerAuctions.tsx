@@ -224,11 +224,64 @@ const SellerAuctions: React.FC = () => {
                         </div>
 
                         {auction.status === 'ended' && auction.winner_username && (
-                          <div className="mt-4 p-3 bg-emerald-50 rounded-lg border border-emerald-200">
-                            <p className="text-sm">
-                              <span className="text-gray-600">Winner: </span>
-                              <span className="text-emerald-700">{auction.winner_username}</span>
-                              <span className="text-gray-600"> - Rs {auction.current_price}</span>
+                          <div className="mt-4 p-4 bg-emerald-50 rounded-lg border border-emerald-200 space-y-2">
+                            <div className="flex justify-between items-start">
+                              <div>
+                                <p className="text-sm font-medium text-emerald-900">Auction Winner</p>
+                                <p className="text-sm mt-1">
+                                  <span className="text-gray-600">Winner: </span>
+                                  <span className="text-emerald-700 font-medium">{auction.winner_username}</span>
+                                </p>
+                                {auction.winner_email && (
+                                  <p className="text-sm text-gray-600">
+                                    <span>Email: </span>
+                                    <span className="text-gray-700">{auction.winner_email}</span>
+                                  </p>
+                                )}
+                                <p className="text-sm text-gray-600">
+                                  <span>Winning Bid: </span>
+                                  <span className="text-emerald-700 font-semibold">Rs {auction.winning_bid_amount || auction.current_price}</span>
+                                </p>
+                              </div>
+                            </div>
+                            {auction.order_info && (
+                              <div className="mt-3 pt-3 border-t border-emerald-200">
+                                <p className="text-xs font-medium text-emerald-900 mb-1">Order Information</p>
+                                <div className="space-y-1">
+                                  <p className="text-xs text-gray-600">
+                                    <span>Order #: </span>
+                                    <span className="text-gray-700 font-mono">{auction.order_info.order_number}</span>
+                                  </p>
+                                  <p className="text-xs text-gray-600">
+                                    <span>Status: </span>
+                                    <Badge className={
+                                      auction.order_info.status === 'delivered' ? 'bg-emerald-100 text-emerald-700' :
+                                      auction.order_info.status === 'shipped' ? 'bg-blue-100 text-blue-700' :
+                                      auction.order_info.status === 'paid' ? 'bg-green-100 text-green-700' :
+                                      'bg-amber-100 text-amber-700'
+                                    }>
+                                      {auction.order_info.status.replace('_', ' ').toUpperCase()}
+                                    </Badge>
+                                  </p>
+                                  <p className="text-xs text-gray-600">
+                                    <span>Your Earnings: </span>
+                                    <span className="text-emerald-700 font-semibold">Rs {auction.order_info.seller_amount}</span>
+                                    <span className="text-gray-500"> (after 2% platform fee)</span>
+                                  </p>
+                                  {auction.order_info.status === 'pending_payment' && auction.order_info.payment_url && (
+                                    <p className="text-xs text-amber-600 mt-2">
+                                      ⏳ Awaiting payment from winner
+                                    </p>
+                                  )}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                        {auction.status === 'ended' && !auction.winner_username && (
+                          <div className="mt-4 p-3 bg-gray-50 rounded-lg border border-gray-200">
+                            <p className="text-sm text-gray-600">
+                              Auction ended with no bids
                             </p>
                           </div>
                         )}
