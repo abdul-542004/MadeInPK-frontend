@@ -180,7 +180,7 @@ export function SellerOrders() {
               Quantity
             </th>
             <th className="px-6 py-3 text-left text-xs text-gray-600 uppercase tracking-wider">
-              Total
+              Your Earnings
             </th>
             <th className="px-6 py-3 text-left text-xs text-gray-600 uppercase tracking-wider">
               Date
@@ -211,7 +211,7 @@ export function SellerOrders() {
                 <span className="text-sm text-gray-700">{order.quantity || 'N/A'}</span>
               </td>
               <td className="px-6 py-4 whitespace-nowrap">
-                <span className="text-sm text-gray-900">{formatAmount(order.total_amount)}</span>
+                <span className="text-sm font-semibold text-emerald-700">{formatAmount(order.seller_amount)}</span>
               </td>
               <td className="px-6 py-4 whitespace-nowrap">
                 <span className="text-sm text-gray-600">{formatDate(order.created_at)}</span>

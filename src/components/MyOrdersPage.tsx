@@ -10,6 +10,7 @@ import { MOCK_MODE } from "../lib/mockMode";
 import { toast } from "sonner";
 import { ComplaintDialog } from "./ComplaintDialog";
 import { FeedbackDialog } from "./FeedbackDialog";
+import { BuyerMessageBox } from "./BuyerMessageBox";
 
 interface MyOrdersPageProps {
   onBack: () => void;
@@ -58,6 +59,13 @@ export function MyOrdersPage({ onBack }: MyOrdersPageProps) {
   const [complaintDialogOpen, setComplaintDialogOpen] = useState(false);
   const [feedbackDialogOpen, setFeedbackDialogOpen] = useState(false);
   const [dialogOrder, setDialogOrder] = useState<Order | null>(null);
+  
+  // Message box state
+  const [messageBoxOpen, setMessageBoxOpen] = useState(false);
+  const [messageBoxSellerId, setMessageBoxSellerId] = useState<number | null>(null);
+  const [messageBoxSellerName, setMessageBoxSellerName] = useState<string>("");
+  const [messageBoxProductId, setMessageBoxProductId] = useState<number | null>(null);
+  const [messageBoxProductName, setMessageBoxProductName] = useState<string>("");
 
   useEffect(() => {
     loadOrders();
@@ -399,17 +407,44 @@ export function MyOrdersPage({ onBack }: MyOrdersPageProps) {
                             {items.map((item, index) => (
                               <div
                                 key={index}
-                                className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
+                                className="p-3 bg-gray-50 rounded-lg"
                               >
-                                <div className="flex-1">
-                                  <p className="font-medium text-gray-900">{item.product_name}</p>
-                                  <p className="text-sm text-gray-600">
-                                    Quantity: {item.quantity} × PKR {parseFloat(item.unit_price).toLocaleString()}
+                                <div className="flex items-center justify-between">
+                                  <div className="flex-1">
+                                    <p className="font-medium text-gray-900">{item.product_name}</p>
+                                    <p className="text-sm text-gray-600">
+                                      Quantity: {item.quantity} × PKR {parseFloat(item.unit_price).toLocaleString()}
+                                    </p>
+                                    {/* Show seller info for cart orders */}
+                                    {order.order_type === "cart" && 'seller_username' in item && (
+                                      <div className="flex items-center gap-2 mt-1">
+                                        <p className="text-xs text-gray-500">
+                                          Seller: {item.seller_username}
+                                        </p>
+                                        <Button
+                                          variant="ghost"
+                                          size="sm"
+                                          className="h-6 px-2 text-xs text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50"
+                                          onClick={() => {
+                                            if ('seller_id' in item && 'product' in item) {
+                                              setMessageBoxSellerId(item.seller_id);
+                                              setMessageBoxSellerName(item.seller_username);
+                                              setMessageBoxProductId(item.product);
+                                              setMessageBoxProductName(item.product_name);
+                                              setMessageBoxOpen(true);
+                                            }
+                                          }}
+                                        >
+                                          <MessageSquare className="h-3 w-3 mr-1" />
+                                          Contact
+                                        </Button>
+                                      </div>
+                                    )}
+                                  </div>
+                                  <p className="font-semibold text-emerald-700 ml-4">
+                                    PKR {parseFloat(item.subtotal).toLocaleString()}
                                   </p>
                                 </div>
-                                <p className="font-semibold text-emerald-700">
-                                  PKR {parseFloat(item.subtotal).toLocaleString()}
-                                </p>
                               </div>
                             ))}
                           </div>
@@ -526,8 +561,8 @@ export function MyOrdersPage({ onBack }: MyOrdersPageProps) {
                             </Button>
                           )}
 
-                          {/* Rate Seller - show for shipped or delivered orders */}
-                          {(order.status === "shipped" || order.status === "delivered") && (
+                          {/* Rate Seller - show only for auction orders that are shipped or delivered */}
+                          {order.order_type === "auction" && (order.status === "shipped" || order.status === "delivered") && (
                             <Button
                               variant="outline"
                               size="sm"
@@ -539,6 +574,17 @@ export function MyOrdersPage({ onBack }: MyOrdersPageProps) {
                               <Star className="h-4 w-4 mr-2" />
                               Rate Seller
                             </Button>
+                          )}
+
+                          {/* Review Product - show only for cart and fixed_price orders that are shipped or delivered */}
+                          {(order.order_type === "cart" || order.order_type === "fixed_price") && 
+                           (order.status === "shipped" || order.status === "delivered") && (
+                            <div className="flex items-center gap-2 px-3 py-2 bg-amber-50 border border-amber-200 rounded-lg">
+                              <Star className="h-4 w-4 text-amber-600" />
+                              <p className="text-xs text-amber-700">
+                                Don't forget to review this product!
+                              </p>
+                            </div>
                           )}
 
                           {/* Report Issue - show for shipped or delivered orders */}
@@ -556,11 +602,68 @@ export function MyOrdersPage({ onBack }: MyOrdersPageProps) {
                             </Button>
                           )}
 
-                          {order.seller_username && (
-                            <Button variant="outline" size="sm">
-                              <MessageSquare className="h-4 w-4 mr-2" />
-                              Contact Seller
-                            </Button>
+                          {/* Contact Seller - show for all orders except cancelled and payment_failed */}
+                          {!["cancelled", "payment_failed"].includes(order.status) && (
+                            order.seller_username ? (
+                              <Button 
+                                variant="outline" 
+                                size="sm"
+                                onClick={() => {
+                                  // Open message box with seller info
+                                  setMessageBoxSellerId(order.seller);
+                                  setMessageBoxSellerName(order.seller_username || "Seller");
+                                  setMessageBoxProductId(order.product);
+                                  setMessageBoxProductName(order.product_name || "");
+                                  setMessageBoxOpen(true);
+                                }}
+                              >
+                                <MessageSquare className="h-4 w-4 mr-2" />
+                                Contact {order.seller_username}
+                              </Button>
+                            ) : order.order_type === "cart" && order.items && order.items.length > 0 ? (
+                              (() => {
+                                // Get unique sellers from the cart items
+                                const uniqueSellers = Array.from(
+                                  new Map(
+                                    order.items!.map(item => [
+                                      item.seller_id,
+                                      { id: item.seller_id, name: item.seller_username, product: item.product, productName: item.product_name }
+                                    ])
+                                  ).values()
+                                );
+
+                                if (uniqueSellers.length === 1) {
+                                  // Single seller in cart
+                                  const seller = uniqueSellers[0];
+                                  return (
+                                    <Button 
+                                      variant="outline" 
+                                      size="sm"
+                                      onClick={() => {
+                                        setMessageBoxSellerId(seller.id);
+                                        setMessageBoxSellerName(seller.name);
+                                        setMessageBoxProductId(seller.product);
+                                        setMessageBoxProductName(seller.productName);
+                                        setMessageBoxOpen(true);
+                                      }}
+                                    >
+                                      <MessageSquare className="h-4 w-4 mr-2" />
+                                      Contact {seller.name}
+                                    </Button>
+                                  );
+                                } else {
+                                  // Multiple sellers - show info message
+                                  return (
+                                    <div className="flex items-center gap-2 px-3 py-2 bg-blue-50 border border-blue-200 rounded-lg">
+                                      <MessageSquare className="h-4 w-4 text-blue-600" />
+                                      <p className="text-xs text-blue-700">
+                                        {uniqueSellers.length} sellers • Contact them from product pages
+                                      </p>
+                                    </div>
+                                  );
+                                }
+                              })()
+                            ) : null
                           )}
                         </div>
                       </div>
@@ -671,6 +774,18 @@ export function MyOrdersPage({ onBack }: MyOrdersPageProps) {
           orderNumber={dialogOrder.order_number}
           productName={dialogOrder.product_name || "Product"}
           sellerName={dialogOrder.seller_username || "Seller"}
+        />
+      )}
+
+      {/* Buyer Message Box */}
+      {messageBoxSellerId && (
+        <BuyerMessageBox
+          sellerId={messageBoxSellerId}
+          sellerName={messageBoxSellerName}
+          productName={messageBoxProductName}
+          productId={messageBoxProductId || undefined}
+          isOpen={messageBoxOpen}
+          onToggle={() => setMessageBoxOpen(!messageBoxOpen)}
         />
       )}
     </div>

@@ -558,7 +558,7 @@ export function MyAccountPanel({
                       </p>
                     </div>
                   )}
-                  {order.status === 'shipped' && (
+                  {order.status === 'shipped' && order.order_type === 'auction' && (
                     <div className="mt-3 pt-3 border-t space-y-2">
                       <p className="text-xs text-blue-700">
                         ✓ Item has been shipped!

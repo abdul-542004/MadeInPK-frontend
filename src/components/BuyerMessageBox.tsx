@@ -28,6 +28,14 @@ export function BuyerMessageBox({ sellerId, sellerName, productName, productId, 
   const [minimized, setMinimized] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
+  // Reset conversation when seller/product changes
+  useEffect(() => {
+    if (isOpen) {
+      setConversation(null);
+      setMessages([]);
+    }
+  }, [sellerId, productId]);
+
   // Load or create conversation when opened
   useEffect(() => {
     if (isOpen && user && !conversation) {
@@ -132,7 +140,7 @@ export function BuyerMessageBox({ sellerId, sellerName, productName, productId, 
 
   if (!isOpen) {
     return (
-      <div className="fixed bottom-6 left-6 z-50">
+      <div className="fixed bottom-8 left-8 z-50">
         <Button
           onClick={onToggle}
           className="h-14 w-14 rounded-full bg-emerald-600 hover:bg-emerald-700 shadow-lg hover:shadow-xl transition-all duration-200"
@@ -144,7 +152,7 @@ export function BuyerMessageBox({ sellerId, sellerName, productName, productId, 
   }
 
   return (
-    <div className="fixed bottom-6 left-6 z-50">
+    <div className="fixed bottom-8 left-8 z-50">
       <Card className={`w-80 sm:w-96 border-emerald-200 shadow-2xl ${
         minimized ? 'h-14' : 'h-[500px]'
       } transition-all duration-200`}>

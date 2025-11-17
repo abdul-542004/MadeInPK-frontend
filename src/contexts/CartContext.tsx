@@ -74,7 +74,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
         image: item.product.images.find(img => img.is_primary)?.image || item.product.images[0]?.image || '',
         rating: item.product.average_rating || 0,
         reviews: item.product.total_reviews || 0,
-        artisan: item.seller_username,
+        artisan: item.seller_brand_name || item.seller_username,
         category: item.product.category_name,
         description: item.product.description,
         inStock: item.is_available,

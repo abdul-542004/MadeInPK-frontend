@@ -168,8 +168,27 @@ export function SellerRegistrationForm({ open, onOpenChange, onComplete }: Selle
             </div>
           </div>
 
+          {/* Important Information */}
+          <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 space-y-2">
+            <h4 className="font-semibold text-amber-900 text-sm">Important Information</h4>
+            <ul className="text-xs text-amber-800 space-y-1.5">
+              <li className="flex items-start gap-2">
+                <span className="text-amber-600 mt-0.5">•</span>
+                <span><strong>Platform Fee:</strong> We charge a 2% commission on every successful sale</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="text-amber-600 mt-0.5">•</span>
+                <span><strong>Shipping:</strong> You are responsible for shipping your products to buyers. We do not handle shipping logistics</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="text-amber-600 mt-0.5">•</span>
+                <span><strong>Payments:</strong> Funds are transferred to you after successful delivery and platform fee deduction</span>
+              </li>
+            </ul>
+          </div>
+
           {/* Action Buttons */}
-          <div className="flex gap-3 pt-6">
+          <div className="flex gap-3 pt-4">
             <Button
               type="submit"
               className="flex-1 bg-emerald-700 hover:bg-emerald-800"

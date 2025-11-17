@@ -47,10 +47,10 @@ export function Hero({ onNavigate }: HeroProps) {
 
   return (
     <section className="relative bg-gradient-to-r from-emerald-50 to-teal-50 overflow-hidden">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 sm:py-20">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 sm:py-24">
         {/* Top Section - Badge and Carousel */}
-        <div className="text-center mb-12">
-          <div className="inline-block px-6 py-3 bg-emerald-100 text-emerald-800 rounded-full mb-8">
+        <div className="text-center mb-16">
+          <div className="inline-block px-6 py-3 bg-emerald-100 text-emerald-800 rounded-full mb-8 text-sm font-semibold uppercase tracking-wide">
             Celebrating Pakistani Craftsmanship
           </div>
           
@@ -126,13 +126,13 @@ export function Hero({ onNavigate }: HeroProps) {
         </div>
 
         {/* Bottom Section - Discover Rich Heritage */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 items-center mt-16">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 items-center mt-20">
           {/* Left Content */}
           <div className="space-y-6">
-            <h1 className="text-gray-900">
+            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-gray-900 leading-tight">
               Discover the Rich Heritage of Pakistan
             </h1>
-            <p className="text-gray-600">
+            <p className="text-lg text-gray-600 leading-relaxed">
               Explore our curated collection of authentic Pakistani handcrafted products. 
               From intricate textiles to traditional pottery, each piece tells a story of 
               centuries-old craftsmanship and cultural pride.
@@ -157,17 +157,17 @@ export function Hero({ onNavigate }: HeroProps) {
 
           {/* Right Stats */}
           <div className="grid grid-cols-3 gap-6">
-            <div className="bg-white p-6 rounded-lg shadow-md text-center">
-              <div className="text-emerald-700">500+</div>
-              <div className="text-sm text-gray-600 mt-2">Products</div>
+            <div className="bg-white p-6 rounded-lg shadow-md text-center hover:shadow-lg transition-shadow">
+              <div className="text-3xl font-bold text-emerald-700">500+</div>
+              <div className="text-sm text-gray-600 mt-2 font-medium">Products</div>
             </div>
-            <div className="bg-white p-6 rounded-lg shadow-md text-center">
-              <div className="text-emerald-700">200+</div>
-              <div className="text-sm text-gray-600 mt-2">Artisans</div>
+            <div className="bg-white p-6 rounded-lg shadow-md text-center hover:shadow-lg transition-shadow">
+              <div className="text-3xl font-bold text-emerald-700">200+</div>
+              <div className="text-sm text-gray-600 mt-2 font-medium">Artisans</div>
             </div>
-            <div className="bg-white p-6 rounded-lg shadow-md text-center">
-              <div className="text-emerald-700">50+</div>
-              <div className="text-sm text-gray-600 mt-2">Cities</div>
+            <div className="bg-white p-6 rounded-lg shadow-md text-center hover:shadow-lg transition-shadow">
+              <div className="text-3xl font-bold text-emerald-700">50+</div>
+              <div className="text-sm text-gray-600 mt-2 font-medium">Cities</div>
             </div>
           </div>
         </div>

@@ -33,6 +33,7 @@ export interface CartItem {
   available_quantity: number;
   seller_id: number;
   seller_username: string;
+  seller_brand_name?: string;
   added_at: string;
   updated_at: string;
 }
@@ -139,7 +140,7 @@ export const cartService = {
 
   /**
    * Update cart item quantity
-   * PATCH /api/cart/items/{item_id}/
+   * PATCH/PUT /api/cart/items/{item_id}/
    */
   updateCartItem: async (itemId: number, data: UpdateCartItemRequest): Promise<CartItem> => {
     const response = await apiClient.patch<CartItem>(`/cart/items/${itemId}/`, data);

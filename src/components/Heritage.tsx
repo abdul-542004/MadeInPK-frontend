@@ -27,18 +27,18 @@ const features = [
 
 export function Heritage() {
   return (
-    <section className="py-16 bg-white">
+    <section className="py-20 bg-gradient-to-b from-gray-50 to-white">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Heritage Story */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center mb-16">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center mb-20">
           <div className="order-2 lg:order-1">
-            <div className="inline-block px-4 py-2 bg-amber-100 text-amber-800 rounded-full mb-6">
+            <div className="inline-block px-4 py-2 bg-amber-100 text-amber-800 rounded-full mb-6 text-xs font-semibold uppercase tracking-wide">
               Our Heritage
             </div>
-            <h2 className="text-gray-900 mb-6">
+            <h2 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-6 leading-tight">
               Preserving Pakistan's Rich Cultural Legacy
             </h2>
-            <p className="text-gray-600 mb-4">
+            <p className="text-lg text-gray-600 mb-4 leading-relaxed">
               Pakistan's artistic heritage spans thousands of years, from the ancient Indus Valley civilization 
               to the vibrant crafts of today. Our mission is to celebrate and preserve this rich cultural 
               tapestry by connecting traditional artisans with a global audience.
@@ -48,14 +48,14 @@ export function Heritage() {
               and techniques that have been refined over centuries. From the intricate embroidery of Sindh 
               to the blue pottery of Multan, every piece tells a unique story of Pakistani heritage.
             </p>
-            <div className="grid grid-cols-2 gap-6">
+            <div className="grid grid-cols-2 gap-6 mt-8">
               <div className="border-l-4 border-emerald-700 pl-4">
-                <div className="text-emerald-700">1000+</div>
-                <div className="text-sm text-gray-600">Years of Heritage</div>
+                <div className="text-3xl font-bold text-emerald-700">1000+</div>
+                <div className="text-sm text-gray-600 mt-1 font-medium">Years of Heritage</div>
               </div>
               <div className="border-l-4 border-emerald-700 pl-4">
-                <div className="text-emerald-700">30+</div>
-                <div className="text-sm text-gray-600">Traditional Crafts</div>
+                <div className="text-3xl font-bold text-emerald-700">30+</div>
+                <div className="text-sm text-gray-600 mt-1 font-medium">Traditional Crafts</div>
               </div>
             </div>
           </div>
@@ -76,13 +76,13 @@ export function Heritage() {
         {/* Features */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
           {features.map((feature, index) => (
-            <Card key={index} className="border-0 shadow-md hover:shadow-lg transition-shadow">
+            <Card key={index} className="border-0 shadow-md hover:shadow-xl transition-all duration-300 hover:-translate-y-1">
               <CardContent className="p-6">
-                <div className="bg-emerald-100 w-12 h-12 rounded-lg flex items-center justify-center mb-4">
-                  <feature.icon className="h-6 w-6 text-emerald-700" />
+                <div className="bg-emerald-100 w-14 h-14 rounded-xl flex items-center justify-center mb-4">
+                  <feature.icon className="h-7 w-7 text-emerald-700" />
                 </div>
-                <h3 className="text-gray-900 mb-2">{feature.title}</h3>
-                <p className="text-sm text-gray-600">{feature.description}</p>
+                <h3 className="text-lg font-bold text-gray-900 mb-2">{feature.title}</h3>
+                <p className="text-sm text-gray-600 leading-relaxed">{feature.description}</p>
               </CardContent>
             </Card>
           ))}

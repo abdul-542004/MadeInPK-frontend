@@ -383,6 +383,27 @@ export function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
                 </select>
               </div>
 
+              {/* Seller Information Notice */}
+              {(signupRole === 'seller' || signupRole === 'both') && (
+                <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 space-y-2">
+                  <h4 className="font-semibold text-amber-900 text-xs">Seller Account Information</h4>
+                  <ul className="text-xs text-amber-800 space-y-1">
+                    <li className="flex items-start gap-1.5">
+                      <span className="text-amber-600 mt-0.5">•</span>
+                      <span><strong>2% commission</strong> on every successful sale</span>
+                    </li>
+                    <li className="flex items-start gap-1.5">
+                      <span className="text-amber-600 mt-0.5">•</span>
+                      <span>You handle <strong>shipping</strong> - we don't manage logistics</span>
+                    </li>
+                    <li className="flex items-start gap-1.5">
+                      <span className="text-amber-600 mt-0.5">•</span>
+                      <span>Complete seller profile & Stripe setup after registration</span>
+                    </li>
+                  </ul>
+                </div>
+              )}
+
               <label className="flex items-start gap-2 cursor-pointer text-sm">
                 <input type="checkbox" className="mt-0.5 rounded border-gray-300" required />
                 <span className="text-gray-600">

@@ -176,6 +176,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(null);
       localStorage.removeItem('authToken');
       localStorage.removeItem('user');
+      
+      // Refresh the page to clear all app state
+      window.location.href = '/';
     }
   };
 

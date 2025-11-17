@@ -8,6 +8,8 @@ import { productService } from "../services/productService";
 import { FixedPriceListing } from "../types/product";
 import { toast } from "sonner";
 import { useWishlist } from "../contexts/WishlistContext";
+import { useCart } from "../contexts/CartContext";
+import { useAuth } from "../contexts/AuthContext";
 
 interface FeaturedProductsProps {
   onNavigate?: (page: string) => void;
@@ -18,6 +20,8 @@ export function FeaturedProducts({ onNavigate, onListingSelect }: FeaturedProduc
   const [listings, setListings] = useState<FixedPriceListing[]>([]);
   const [loading, setLoading] = useState(true);
   const { toggleWishlist, isInWishlist, loading: wishlistLoading } = useWishlist();
+  const { addToCart } = useCart();
+  const { isAuthenticated } = useAuth();
 
   useEffect(() => {
     loadProducts();
@@ -66,11 +70,14 @@ export function FeaturedProducts({ onNavigate, onListingSelect }: FeaturedProduc
   }
 
   return (
-    <section className="py-16 bg-white">
+    <section className="py-20 bg-white">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="text-center mb-12">
-          <h2 className="text-gray-900 mb-4">Featured Products</h2>
-          <p className="text-gray-600 max-w-2xl mx-auto">
+        <div className="text-center mb-16">
+          <div className="inline-block px-4 py-2 bg-emerald-100 text-emerald-800 rounded-full mb-4 text-xs font-semibold uppercase tracking-wide">
+            Curated Collection
+          </div>
+          <h2 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-4">Featured Products</h2>
+          <p className="text-lg text-gray-600 max-w-2xl mx-auto">
             Handpicked treasures from skilled Pakistani artisans, each piece a testament to traditional craftsmanship
           </p>
         </div>
@@ -96,6 +103,47 @@ export function FeaturedProducts({ onNavigate, onListingSelect }: FeaturedProduc
               } catch (error) {
                 console.error("Failed to toggle wishlist:", error);
                 toast.error("Unable to update wishlist. Please try again.");
+              }
+            };
+
+            const handleAddToCart = async (e: React.MouseEvent) => {
+              e.stopPropagation();
+              
+              if (!isAuthenticated) {
+                toast.error("Please login to add items to cart");
+                return;
+              }
+
+              if (listing.quantity === 0) {
+                return;
+              }
+
+              try {
+                await addToCart(
+                  {
+                    id: product.id,
+                    name: product.name,
+                    price: currentPrice,
+                    image: primaryImage?.image_url || "",
+                    rating: product.average_rating || 0,
+                    reviews: product.total_reviews || 0,
+                    artisan: product.seller_profile?.brand_name || product.seller_username,
+                    category: product.category_name,
+                    subCategory: "",
+                    region: "",
+                    description: product.description,
+                    inStock: listing.quantity > 0,
+                    featured: false,
+                    tags: [],
+                  },
+                  1,
+                  undefined,
+                  listing.id
+                );
+                toast.success(`${product.name} added to cart!`);
+              } catch (error) {
+                console.error("Failed to add to cart:", error);
+                toast.error("Failed to add item to cart");
               }
             };
 
@@ -169,10 +217,7 @@ export function FeaturedProducts({ onNavigate, onListingSelect }: FeaturedProduc
                       size="sm" 
                       className="w-full bg-emerald-700 hover:bg-emerald-800"
                       disabled={listing.quantity === 0}
-                      onClick={(e: React.MouseEvent) => {
-                        e.stopPropagation();
-                        toast.info("Add to cart feature coming soon!");
-                      }}
+                      onClick={handleAddToCart}
                     >
                       <ShoppingCart className="h-4 w-4 mr-2" />
                       {listing.quantity > 0 ? 'Add to Cart' : 'Out of Stock'}

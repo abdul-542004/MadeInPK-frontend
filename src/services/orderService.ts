@@ -13,10 +13,17 @@ export interface ShippingAddressDetail {
 
 export interface OrderItem {
   id: number;
+  product: number;
   product_name: string;
+  product_image: string | null;
+  seller_id: number;
+  seller_username: string;
   quantity: number;
   unit_price: string;
   subtotal: string;
+  is_shipped: boolean;
+  shipped_at: string | null;
+  created_at: string;
 }
 
 export interface Order {

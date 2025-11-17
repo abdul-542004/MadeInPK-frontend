@@ -13,7 +13,8 @@ import {
   Bell,
   Menu,
   X,
-  Gavel
+  Gavel,
+  Star
 } from "lucide-react";
 import { useAuth } from "../../contexts/AuthContext";
 import { Avatar, AvatarFallback } from "../ui/avatar";
@@ -28,6 +29,7 @@ import { SellerEarnings } from "./SellerEarnings";
 import { SellerMessages } from "./SellerMessages";
 import { SellerSettings } from "./SellerSettings";
 import SellerAuctions from "./SellerAuctions";
+import { SellerReviews } from "./SellerReviews";
 import { toast } from "sonner";
 import {
   DropdownMenu,
@@ -38,7 +40,7 @@ import {
   DropdownMenuTrigger,
 } from "../ui/dropdown-menu";
 
-type SellerView = "dashboard" | "products" | "add-product" | "orders" | "order-history" | "earnings" | "messages" | "settings" | "auctions";
+type SellerView = "dashboard" | "products" | "add-product" | "orders" | "order-history" | "earnings" | "messages" | "settings" | "auctions" | "reviews";
 
 interface SellerDashboardProps {
   onNavigate: (page: string) => void;
@@ -57,6 +59,7 @@ export function SellerDashboard({ onNavigate }: SellerDashboardProps) {
     { id: "orders" as SellerView, label: "Orders", icon: ShoppingBag },
     { id: "order-history" as SellerView, label: "Order History", icon: History },
     { id: "earnings" as SellerView, label: "Earnings", icon: DollarSign },
+    { id: "reviews" as SellerView, label: "Reviews", icon: Star },
     { id: "messages" as SellerView, label: "Messages", icon: MessageSquare },
     { id: "settings" as SellerView, label: "Settings", icon: Settings },
   ];
@@ -97,6 +100,8 @@ export function SellerDashboard({ onNavigate }: SellerDashboardProps) {
         return <SellerOrderHistory />;
       case "earnings":
         return <SellerEarnings />;
+      case "reviews":
+        return <SellerReviews />;
       case "messages":
         return <SellerMessages />;
       case "settings":
@@ -176,7 +181,7 @@ export function SellerDashboard({ onNavigate }: SellerDashboardProps) {
       </nav>
 
       {/* Sidebar + Main Content */}
-      <div className="flex pt-16">
+      <div className="flex">
         {/* Sidebar */}
         <aside
           className={`

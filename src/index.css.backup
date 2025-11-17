@@ -1,129 +1,66 @@
-@import "tailwindcss";/*! tailwindcss v4.1.3 | MIT License | https://tailwindcss.com */
-
+/*! tailwindcss v4.1.3 | MIT License | https://tailwindcss.com */
 @layer properties {
-
-:root {  @supports (((-webkit-hyphens: none)) and (not (margin-trim: inline))) or ((-moz-orient: inline) and (not (color: rgb(from red r g b)))) {
-
-  --font-size: 16px;    *, :before, :after, ::backdrop {
-
-  --background: #fff;      --tw-translate-x: 0;
-
-  --foreground: oklch(.145 0 0);      --tw-translate-y: 0;
-
-  --card: #fff;      --tw-translate-z: 0;
-
-  --card-foreground: oklch(.145 0 0);      --tw-rotate-x: rotateX(0);
-
-  --popover: oklch(1 0 0);      --tw-rotate-y: rotateY(0);
-
-  --popover-foreground: oklch(.145 0 0);      --tw-rotate-z: rotateZ(0);
-
-  --primary: #030213;      --tw-skew-x: skewX(0);
-
-  --primary-foreground: oklch(1 0 0);      --tw-skew-y: skewY(0);
-
-  --secondary: oklch(.95 .0058 264.53);      --tw-space-y-reverse: 0;
-
-  --secondary-foreground: #030213;      --tw-space-x-reverse: 0;
-
-  --muted: #ececf0;      --tw-divide-y-reverse: 0;
-
-  --muted-foreground: #717182;      --tw-border-style: solid;
-
-  --accent: #e9ebef;      --tw-gradient-position: initial;
-
-  --accent-foreground: #030213;      --tw-gradient-from: #0000;
-
-  --destructive: #d4183d;      --tw-gradient-via: #0000;
-
-  --destructive-foreground: #fff;      --tw-gradient-to: #0000;
-
-  --border: #0000001a;      --tw-gradient-stops: initial;
-
-  --input: transparent;      --tw-gradient-via-stops: initial;
-
-  --input-background: #f3f3f5;      --tw-gradient-from-position: 0%;
-
-  --switch-background: #cbced4;      --tw-gradient-via-position: 50%;
-
-  --font-weight-medium: 500;      --tw-gradient-to-position: 100%;
-
-  --font-weight-normal: 400;      --tw-leading: initial;
-
-  --ring: oklch(.708 0 0);      --tw-font-weight: initial;
-
-  --chart-1: oklch(.646 .222 41.116);      --tw-tracking: initial;
-
-  --chart-2: oklch(.769 .188 70.08);      --tw-shadow: 0 0 #0000;
-
-  --chart-3: oklch(.558 .288 302.321);      --tw-shadow-color: initial;
-
-  --chart-4: oklch(.592 .249 .584);      --tw-shadow-alpha: 100%;
-
-  --chart-5: oklch(.646 .17 162.48);      --tw-inset-shadow: 0 0 #0000;
-
-  --radius: .5rem;      --tw-inset-shadow-color: initial;
-
-}      --tw-inset-shadow-alpha: 100%;
-
+  @supports (((-webkit-hyphens: none)) and (not (margin-trim: inline))) or ((-moz-orient: inline) and (not (color: rgb(from red r g b)))) {
+    *, :before, :after, ::backdrop {
+      --tw-translate-x: 0;
+      --tw-translate-y: 0;
+      --tw-translate-z: 0;
+      --tw-rotate-x: rotateX(0);
+      --tw-rotate-y: rotateY(0);
+      --tw-rotate-z: rotateZ(0);
+      --tw-skew-x: skewX(0);
+      --tw-skew-y: skewY(0);
+      --tw-space-y-reverse: 0;
+      --tw-space-x-reverse: 0;
+      --tw-divide-y-reverse: 0;
+      --tw-border-style: solid;
+      --tw-gradient-position: initial;
+      --tw-gradient-from: #0000;
+      --tw-gradient-via: #0000;
+      --tw-gradient-to: #0000;
+      --tw-gradient-stops: initial;
+      --tw-gradient-via-stops: initial;
+      --tw-gradient-from-position: 0%;
+      --tw-gradient-via-position: 50%;
+      --tw-gradient-to-position: 100%;
+      --tw-leading: initial;
+      --tw-font-weight: initial;
+      --tw-tracking: initial;
+      --tw-shadow: 0 0 #0000;
+      --tw-shadow-color: initial;
+      --tw-shadow-alpha: 100%;
+      --tw-inset-shadow: 0 0 #0000;
+      --tw-inset-shadow-color: initial;
+      --tw-inset-shadow-alpha: 100%;
       --tw-ring-color: initial;
-
-@media (prefers-color-scheme: dark) {      --tw-ring-shadow: 0 0 #0000;
-
-  :root {      --tw-inset-ring-color: initial;
-
-    --background: #09090b;      --tw-inset-ring-shadow: 0 0 #0000;
-
-    --foreground: oklch(1 0 0);      --tw-ring-inset: initial;
-
-    --card: #09090b;      --tw-ring-offset-width: 0px;
-
-    --card-foreground: oklch(1 0 0);      --tw-ring-offset-color: #fff;
-
-    --popover: oklch(.145 0 0);      --tw-ring-offset-shadow: 0 0 #0000;
-
-    --popover-foreground: oklch(1 0 0);      --tw-outline-style: solid;
-
-    --primary: oklch(1 0 0);      --tw-blur: initial;
-
-    --primary-foreground: #030213;      --tw-brightness: initial;
-
-    --secondary: oklch(.22 .011 286.07);      --tw-contrast: initial;
-
-    --secondary-foreground: oklch(1 0 0);      --tw-grayscale: initial;
-
-    --muted: #27272a;      --tw-hue-rotate: initial;
-
-    --muted-foreground: #a1a1aa;      --tw-invert: initial;
-
-    --accent: #27272a;      --tw-opacity: initial;
-
-    --accent-foreground: oklch(1 0 0);      --tw-saturate: initial;
-
-    --destructive: #7f1d1d;      --tw-sepia: initial;
-
-    --destructive-foreground: oklch(1 0 0);      --tw-drop-shadow: initial;
-
-    --border: #27272a;      --tw-drop-shadow-color: initial;
-
-    --input: #27272a;      --tw-drop-shadow-alpha: 100%;
-
-    --ring: oklch(.708 0 0);      --tw-drop-shadow-size: initial;
-
-    --chart-1: oklch(.553 .195 38.402);      --tw-backdrop-blur: initial;
-
-    --chart-2: oklch(.681 .162 75.834);      --tw-backdrop-brightness: initial;
-
-    --chart-3: oklch(.511 .096 186.391);      --tw-backdrop-contrast: initial;
-
-    --chart-4: oklch(.52 .105 223.128);      --tw-backdrop-grayscale: initial;
-
-    --chart-5: oklch(.592 .249 .584);      --tw-backdrop-hue-rotate: initial;
-
-  }      --tw-backdrop-invert: initial;
-
-}      --tw-backdrop-opacity: initial;
-
+      --tw-ring-shadow: 0 0 #0000;
+      --tw-inset-ring-color: initial;
+      --tw-inset-ring-shadow: 0 0 #0000;
+      --tw-ring-inset: initial;
+      --tw-ring-offset-width: 0px;
+      --tw-ring-offset-color: #fff;
+      --tw-ring-offset-shadow: 0 0 #0000;
+      --tw-outline-style: solid;
+      --tw-blur: initial;
+      --tw-brightness: initial;
+      --tw-contrast: initial;
+      --tw-grayscale: initial;
+      --tw-hue-rotate: initial;
+      --tw-invert: initial;
+      --tw-opacity: initial;
+      --tw-saturate: initial;
+      --tw-sepia: initial;
+      --tw-drop-shadow: initial;
+      --tw-drop-shadow-color: initial;
+      --tw-drop-shadow-alpha: 100%;
+      --tw-drop-shadow-size: initial;
+      --tw-backdrop-blur: initial;
+      --tw-backdrop-brightness: initial;
+      --tw-backdrop-contrast: initial;
+      --tw-backdrop-grayscale: initial;
+      --tw-backdrop-hue-rotate: initial;
+      --tw-backdrop-invert: initial;
+      --tw-backdrop-opacity: initial;
       --tw-backdrop-saturate: initial;
       --tw-backdrop-sepia: initial;
       --tw-duration: initial;

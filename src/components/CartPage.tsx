@@ -17,9 +17,7 @@ interface CartPageProps {
 
 export function CartPage({ onContinueShopping, onCheckout }: CartPageProps) {
   const { cartItems, removeFromCart, updateQuantity, getCartTotal, loading } = useCart();
-  const subtotal = getCartTotal();
-  const shipping = 0; // Free shipping
-  const total = subtotal + shipping;
+  const total = getCartTotal();
 
   const handleRemove = async (productId: number) => {
     await removeFromCart(productId);
@@ -196,22 +194,19 @@ export function CartPage({ onContinueShopping, onCheckout }: CartPageProps) {
               <div className="space-y-4 mb-6">
                 <div className="flex justify-between pb-3 border-b">
                   <span className="text-gray-600">Subtotal</span>
-                  <span className="text-red-500">₨{subtotal.toLocaleString()}</span>
-                </div>
-
-                <div className="flex justify-between pb-3 border-b">
-                  <span className="text-gray-600">Shipping</span>
-                  <span className="text-emerald-700">Free</span>
+                  <span className="text-red-500">₨{total.toLocaleString()}</span>
                 </div>
 
                 <div className="pb-3 border-b">
-                  <span className="text-sm text-gray-500">Estimate for</span>
-                  <p className="text-sm text-gray-700 mt-1">Pakistan</p>
+                  <p className="text-sm text-gray-500 mb-1">Shipping Information</p>
+                  <p className="text-xs text-amber-700">
+                    Shipping is handled by individual sellers. Contact seller after purchase for shipping details.
+                  </p>
                 </div>
 
                 <div className="flex justify-between pt-2">
-                  <span className="text-gray-900">Total</span>
-                  <span className="text-red-500">₨{total.toLocaleString()}</span>
+                  <span className="text-lg font-semibold text-gray-900">Total</span>
+                  <span className="text-lg font-semibold text-red-500">₨{total.toLocaleString()}</span>
                 </div>
               </div>
 
